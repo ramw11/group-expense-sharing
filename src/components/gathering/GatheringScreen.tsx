@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, Copy, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, Copy, FolderPlus, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Attendance, BillingUnit, Expense, GatheringDraft, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
@@ -10,22 +10,24 @@ import { LanguageToggle } from "../ui/LanguageToggle";
 
 interface GatheringScreenProps {
   group: Group;
-  groups: Group[];
-  units: BillingUnit[];
-  members: Member[];
+  repositoryFamilies: BillingUnit[];
+  repositoryMembers: Member[];
   settings: Settings;
   language: Language;
   draft?: GatheringDraft;
   onLanguageChange(language: Language): void;
   onSave(draft: GatheringDraft): void;
+  onCreateFamily(family: BillingUnit, members: Member[]): void;
   onBack(): void;
   onEditGroup(): void;
-  onGroupChange(groupId: string, eventName: string): void;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function GatheringScreen({ group, groups, units, members, settings, language, draft, onLanguageChange, onSave, onBack, onEditGroup, onGroupChange }: GatheringScreenProps) {
+export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, settings, language, draft, onLanguageChange, onSave, onCreateFamily, onBack, onEditGroup }: GatheringScreenProps) {
+  const [familyIds, setFamilyIds] = useState<string[]>(() => draft?.familyIds ?? []);
+  const units = useMemo(() => repositoryFamilies.filter((family) => familyIds.includes(family.id)), [familyIds, repositoryFamilies]);
+  const members = useMemo(() => repositoryMembers.filter((member) => familyIds.includes(member.billingUnitId)), [familyIds, repositoryMembers]);
   const activeMembers = useMemo(() => members.filter((member) => member.active).sort((a, b) => a.order - b.order), [members]);
   const [eventName, setEventName] = useState(() => draft?.name ?? "");
   const [date, setDate] = useState(() => draft?.date ?? today());
@@ -38,8 +40,41 @@ export function GatheringScreen({ group, groups, units, members, settings, langu
   const [scanState, setScanState] = useState<{ status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number }>({ status: "idle", progress: 0 });
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [manualFamilyName, setManualFamilyName] = useState("");
+  const [manualMemberNames, setManualMemberNames] = useState("");
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const presentCount = presentIds.size;
+
+  const addRepositoryFamily = (familyId: string) => {
+    if (familyIds.includes(familyId)) return;
+    const family = repositoryFamilies.find((item) => item.id === familyId);
+    if (!family) return;
+    const familyMembers = repositoryMembers.filter((member) => member.billingUnitId === familyId);
+    setFamilyIds((current) => [...current, familyId]);
+    setAttendance((current) => [...current, ...familyMembers.filter((member) => member.active && !current.some((item) => item.memberId === member.id)).map((member) => ({ memberId: member.id, present: true }))]);
+    if (!expenseUnitId) setExpenseUnitId(family.id);
+  };
+  const addManualFamily = () => {
+    const familyName = manualFamilyName.trim();
+    const names = manualMemberNames.split(/[,\n]/).map((name) => name.trim()).filter(Boolean);
+    if (!familyName || !names.length) return;
+    const familyId = createId();
+    const family: BillingUnit = { id: familyId, groupId: group.id, name: familyName, order: repositoryFamilies.length };
+    const familyMembers: Member[] = names.map((name, order) => ({ id: createId(), billingUnitId: familyId, name, active: true, order }));
+    onCreateFamily(family, familyMembers);
+    setFamilyIds((current) => [...current, familyId]);
+    setAttendance((current) => [...current, ...familyMembers.map((member) => ({ memberId: member.id, present: true }))]);
+    if (!expenseUnitId) setExpenseUnitId(familyId);
+    setManualFamilyName(""); setManualMemberNames("");
+  };
+  const removeEventFamily = (familyId: string) => {
+    const memberIds = new Set(repositoryMembers.filter((member) => member.billingUnitId === familyId).map((member) => member.id));
+    const remaining = familyIds.filter((id) => id !== familyId);
+    setFamilyIds(remaining);
+    setAttendance((current) => current.filter((item) => !memberIds.has(item.memberId)));
+    setExpenses((current) => current.filter((expense) => expense.billingUnitId !== familyId));
+    if (expenseUnitId === familyId) setExpenseUnitId(remaining[0] ?? "");
+  };
 
   const toggle = (memberId: string) => setAttendance((current) => current.map((item) => item.memberId === memberId ? { ...item, present: !item.present } : item));
   const addExpense = () => {
@@ -63,7 +98,7 @@ export function GatheringScreen({ group, groups, units, members, settings, langu
   const calculation = calculateGathering({ date, units, members, attendance, expenses, settings });
   const settlements = createSettlements(calculation.unitSummaries);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
-  const currentDraft = (): GatheringDraft => ({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date, attendance, expenses, updatedAt: new Date().toISOString() });
+  const currentDraft = (): GatheringDraft => ({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date, familyIds, attendance, expenses, updatedAt: new Date().toISOString() });
   const save = () => { onSave(currentDraft()); setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
   const saveAndBack = () => { onSave(currentDraft()); onBack(); };
   const saveAndEdit = () => { onSave(currentDraft()); onEditGroup(); };
@@ -84,7 +119,7 @@ export function GatheringScreen({ group, groups, units, members, settings, langu
     const nextAttendance = activeMembers.map((member) => ({ memberId: member.id, present: true }));
     const nextDate = today();
     setDate(nextDate); setAttendance(nextAttendance); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
-    onSave({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date: nextDate, attendance: nextAttendance, expenses: [], updatedAt: new Date().toISOString() });
+    onSave({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date: nextDate, familyIds, attendance: nextAttendance, expenses: [], updatedAt: new Date().toISOString() });
   };
 
   return (
@@ -97,8 +132,14 @@ export function GatheringScreen({ group, groups, units, members, settings, langu
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><div className="event-identity-fields"><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><label className="event-name-field"><span>{t("chooseFamily")}</span><select value={group.id} onChange={(event) => onGroupChange(event.target.value, eventName.trim() || t("unnamedEvent"))}>{groups.map((family) => <option value={family.id} key={family.id}>{family.name}</option>)}</select><small>{t("familyChangeWarning")}</small></label></div></div>
+          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label></div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
+        </section>
+
+        <section className="event-family-picker">
+          <header><div><p className="eyebrow">{t("chooseParticipants")}</p><h2>{t("familiesInEvent")}</h2><p>{t("familyPickerCopy")}</p></div><span className="selected-family-count">{familyIds.length}</span></header>
+          <div className="family-picker-grid">{repositoryFamilies.map((family) => { const selected = familyIds.includes(family.id); return <button className={selected ? "selected" : ""} key={family.id} onClick={() => selected ? removeEventFamily(family.id) : addRepositoryFamily(family.id)}><span className="attendance-check">{selected && <Check size={15} />}</span><strong>{family.name}</strong><small>{repositoryMembers.filter((member) => member.billingUnitId === family.id).length} {t("members")}</small></button>; })}</div>
+          <div className="manual-family-row"><div><FolderPlus size={22} /><strong>{t("manualAddition")}</strong><small>{t("manualAdditionCopy")}</small></div><input value={manualFamilyName} onChange={(event) => setManualFamilyName(event.target.value)} placeholder={t("manualFamilyName")} /><input value={manualMemberNames} onChange={(event) => setManualMemberNames(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addManualFamily()} placeholder={t("manualMemberNames")} /><button onClick={addManualFamily}><Plus size={18} /> {t("addToEvent")}</button></div>
         </section>
 
         <div className="gathering-layout">

@@ -11,7 +11,7 @@ export const defaultSettings: Settings = {
 };
 
 export const emptyPersistentData = (): PersistentData => ({
-  version: 2,
+  version: 3,
   groups: [{ id: "group-warhaftig", name: "משפחת ורהפטיג" }],
   billingUnits: [
     { id: "unit-nitzan", groupId: "group-warhaftig", name: "ורהפטיג ניצן", order: 0 },

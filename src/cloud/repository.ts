@@ -62,7 +62,7 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
     supabase.from("groups").select("id,name").eq("id", groupId).single(),
     supabase.from("billing_units").select("id,group_id,name,sort_order").eq("group_id", groupId).order("sort_order"),
     supabase.from("members").select("id,billing_unit_id,name,birth_date,manual_weight,active,notes,sort_order").eq("group_id", groupId).order("sort_order"),
-    supabase.from("events").select("id,name,event_date,updated_at").eq("group_id", groupId).order("updated_at", { ascending: false }),
+    supabase.from("events").select("id,name,event_date,families_linked,updated_at").eq("group_id", groupId).order("updated_at", { ascending: false }),
   ]);
   throwIfError(groupResult.error); throwIfError(unitsResult.error); throwIfError(membersResult.error); throwIfError(eventResult.error);
   if (!groupResult.data) throw new Error("Shared group not found");
@@ -71,17 +71,19 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
   const members: Member[] = (membersResult.data ?? []).map((member) => ({ id: member.id, billingUnitId: member.billing_unit_id, name: member.name, birthDate: member.birth_date ?? undefined, manualWeight: member.manual_weight == null ? undefined : Number(member.manual_weight), active: member.active, notes: member.notes ?? undefined, order: member.sort_order }));
   if (!eventResult.data?.length) return { group, units, members, drafts: [] };
   const eventIds = eventResult.data.map((event) => event.id);
-  const [attendanceResult, expensesResult] = await Promise.all([
+  const [linksResult, attendanceResult, expensesResult] = await Promise.all([
+    supabase.from("event_families").select("event_id,family_id").in("event_id", eventIds),
     supabase.from("attendance").select("event_id,member_id,present").in("event_id", eventIds),
     supabase.from("expenses").select("id,event_id,billing_unit_id,description,amount,receipt_path").in("event_id", eventIds).is("deleted_at", null),
   ]);
-  throwIfError(attendanceResult.error); throwIfError(expensesResult.error);
+  throwIfError(linksResult.error); throwIfError(attendanceResult.error); throwIfError(expensesResult.error);
   const drafts = await Promise.all(eventResult.data.map(async (event) => ({
     id: event.id,
     groupId,
     name: event.name?.trim() || "אירוע שמור",
     date: event.event_date,
     updatedAt: event.updated_at,
+    familyIds: event.families_linked ? (linksResult.data ?? []).filter((link) => link.event_id === event.id).map((link) => link.family_id) : units.map((family) => family.id),
     attendance: (attendanceResult.data ?? []).filter((item) => item.event_id === event.id).map((item) => ({ memberId: item.member_id, present: item.present })),
     expenses: await Promise.all((expensesResult.data ?? []).filter((expense) => expense.event_id === event.id).map(async (expense) => ({ id: expense.id, billingUnitId: expense.billing_unit_id, description: expense.description ?? undefined, amount: Number(expense.amount), receiptUrl: await receiptUrl(expense.receipt_path) }))),
   })));
@@ -111,8 +113,15 @@ export async function deleteCloudMember(id: string) { await ensureAnonymousSessi
 
 export async function saveCloudDraft(groupId: string, draft: GatheringDraft, previous?: GatheringDraft) {
   const user = await ensureAnonymousSession();
-  throwIfError((await supabase.from("events").upsert({ id: draft.id, group_id: groupId, name: draft.name, event_date: draft.date, updated_by: user.id, updated_at: draft.updatedAt })).error);
+  throwIfError((await supabase.from("events").upsert({ id: draft.id, group_id: groupId, name: draft.name, event_date: draft.date, families_linked: true, updated_by: user.id, updated_at: draft.updatedAt })).error);
+  if (draft.familyIds.length) throwIfError((await supabase.from("event_families").upsert(draft.familyIds.map((familyId) => ({ event_id: draft.id, family_id: familyId, group_id: groupId })))).error);
+  const currentFamilyIds = new Set(draft.familyIds);
+  const removedFamilyIds = previous?.familyIds.filter((familyId) => !currentFamilyIds.has(familyId)) ?? [];
+  if (removedFamilyIds.length) throwIfError((await supabase.from("event_families").delete().eq("event_id", draft.id).in("family_id", removedFamilyIds)).error);
   if (draft.attendance.length) throwIfError((await supabase.from("attendance").upsert(draft.attendance.map((item) => ({ event_id: draft.id, group_id: groupId, member_id: item.memberId, present: item.present, updated_by: user.id, updated_at: draft.updatedAt })))).error);
+  const currentMemberIds = new Set(draft.attendance.map((item) => item.memberId));
+  const removedMemberIds = previous?.attendance.filter((item) => !currentMemberIds.has(item.memberId)).map((item) => item.memberId) ?? [];
+  if (removedMemberIds.length) throwIfError((await supabase.from("attendance").delete().eq("event_id", draft.id).in("member_id", removedMemberIds)).error);
   for (const expense of draft.expenses) {
     const path = await uploadReceipt(groupId, draft.id, expense.id, expense.receiptUrl);
     throwIfError((await supabase.from("expenses").upsert({ id: expense.id, event_id: draft.id, group_id: groupId, billing_unit_id: expense.billingUnitId, description: expense.description, amount: expense.amount, receipt_path: path?.startsWith("http") ? undefined : path, updated_by: user.id, updated_at: draft.updatedAt, deleted_at: null })).error);
@@ -130,7 +139,7 @@ export async function clearCloudDraft(eventId: string) {
 export function subscribeToCloudGroup(groupId: string, onChange: () => void) {
   const channel = supabase.channel(`group:${groupId}`);
   channel.on("postgres_changes", { event: "*", schema: "public", table: "groups", filter: `id=eq.${groupId}` }, onChange);
-  for (const table of ["billing_units", "members", "events", "attendance", "expenses"]) {
+  for (const table of ["billing_units", "members", "events", "event_families", "attendance", "expenses"]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `group_id=eq.${groupId}` }, onChange);
   }
   channel.subscribe();

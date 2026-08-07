@@ -2,12 +2,13 @@
 
 A polished, offline-first Progressive Web App for splitting gathering expenses fairly across families, couples, individuals, teams, or any other group, with optional shared groups powered by Supabase.
 
-The app separates reusable family/group definitions from events. Each event has its own name, date, selected family, attendance, and expenses. Local use needs no account; optional anonymous Supabase sessions provide secure sharing and real-time collaboration. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
+The app separates reusable families from independent events. Families and events have a direct many-to-many relationship, so each event can include any number of families and each family can join any number of events. Local use needs no account; optional anonymous Supabase sessions provide secure sharing and real-time collaboration. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
 
 ## Features
 
 - Reusable families and groups, managed separately from events
-- Multiple independent events with a name, date, and selected family
+- Multiple independent events with a name, date, and linked families
+- Link families from either the event screen or the family repository
 - Billing units for people who pay together
 - Member profiles with active status, birth date, notes, and optional manual weight
 - Automatic child weighting based on the gathering date
@@ -21,7 +22,7 @@ The app separates reusable family/group definitions from events. Each event has 
 - Suggested payments between billing units
 - Copyable settlement report
 - Configurable currency, rounding, child threshold, child weight, and report footer
-- LocalStorage persistence for groups, billing units, members, and settings
+- LocalStorage persistence for families, events, members, and settings
 - Shareable group links and real-time multi-device synchronization
 - Installable PWA with offline support
 - Hebrew-first interface with an English option and full RTL support
@@ -41,7 +42,7 @@ src/
 └── utils/       Framework-independent utilities
 ```
 
-Attendance and expenses are saved per event and can be resumed later. A family can be reused across multiple events. Business functions do not import React or LocalStorage.
+Attendance and expenses are saved per event and can be resumed later. The `event_families` relation links reusable families and events without nesting either inside the other. Business functions do not import React or LocalStorage.
 
 ## Installation
 

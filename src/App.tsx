@@ -1,24 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GatheringScreen } from "./components/gathering/GatheringScreen";
-import { FamilyHome } from "./components/groups/FamilyHome";
 import { GroupHome } from "./components/groups/GroupHome";
 import { GroupWorkspace } from "./components/groups/GroupWorkspace";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
 import type { CloudGroupSnapshot } from "./cloud/repository";
-import { clearCloudDraft, createSharedGroup, deleteCloudGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, saveCloudDraft, saveCloudGroup, saveCloudMember, saveCloudUnit, subscribeToCloudGroup } from "./cloud/repository";
-import type { GatheringDraft, PersistentData } from "./domain/models";
+import { clearCloudDraft, createSharedGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, saveCloudDraft, saveCloudMember, saveCloudUnit, subscribeToCloudGroup } from "./cloud/repository";
+import type { BillingUnit, GatheringDraft, Member, PersistentData } from "./domain/models";
 import { createId } from "./utils/id";
 import { localAppStorage } from "./storage/localStorage";
 import { usePersistentData } from "./hooks/usePersistentData";
 
-type Screen =
-  | { name: "home" }
-  | { name: "families" }
-  | { name: "manage"; groupId: string; returnToEventId?: string }
-  | { name: "gathering"; eventId: string }
-  | { name: "settings" };
+type Screen = { name: "home" } | { name: "families" } | { name: "gathering"; eventId: string } | { name: "settings" };
 type CloudStatus = "idle" | "syncing" | "synced" | "error";
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 const mergeSnapshot = (current: PersistentData, snapshot: CloudGroupSnapshot): PersistentData => {
@@ -28,7 +21,7 @@ const mergeSnapshot = (current: PersistentData, snapshot: CloudGroupSnapshot): P
     groups: [...current.groups.filter((group) => group.id !== snapshot.group.id), snapshot.group],
     billingUnits: [...current.billingUnits.filter((unit) => unit.groupId !== snapshot.group.id), ...snapshot.units],
     members: [...current.members.filter((member) => !previousUnitIds.has(member.billingUnitId)), ...snapshot.members],
-    gatheringDrafts: [...current.gatheringDrafts.filter((draft) => draft.groupId !== snapshot.group.id), ...snapshot.drafts],
+    gatheringDrafts: [...current.gatheringDrafts.filter((event) => event.groupId !== snapshot.group.id), ...snapshot.drafts],
   };
 };
 
@@ -39,13 +32,12 @@ export default function App() {
   const [cloudMessage, setCloudMessage] = useState("");
   const handledInvite = useRef(false);
   const language = data.settings.language;
+  const primaryGroup = data.groups[0];
+  const repositoryFamilies = primaryGroup ? data.billingUnits.filter((unit) => unit.groupId === primaryGroup.id) : [];
   const sharedGroupIds = useMemo(() => data.sharedGroups.map((item) => item.groupId).sort().join("|"), [data.sharedGroups]);
   const shared = (groupId: string) => data.sharedGroups.some((connection) => connection.groupId === groupId);
 
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = language === "he" ? "rtl" : "ltr";
-  }, [language]);
+  useEffect(() => { document.documentElement.lang = language; document.documentElement.dir = language === "he" ? "rtl" : "ltr"; }, [language]);
 
   useEffect(() => {
     if (handledInvite.current) return;
@@ -57,8 +49,7 @@ export default function App() {
       const snapshot = await loadCloudGroup(groupId);
       setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [...current.sharedGroups.filter((item) => item.groupId !== groupId), { groupId, role: "editor" }] }));
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      setCloudStatus("synced");
-      setCloudMessage(language === "he" ? "הצטרפתם למשפחה ולאירועים המשותפים" : "Joined the shared family and its events");
+      setCloudStatus("synced"); setCloudMessage(language === "he" ? "הצטרפתם למאגר ולאירועים המשותפים" : "Joined the shared repository and events");
     }).catch(() => { setCloudStatus("error"); setCloudMessage(language === "he" ? "קישור ההצטרפות אינו תקין או שפג תוקפו" : "The invitation is invalid or expired"); });
   }, [language, setData]);
 
@@ -85,26 +76,24 @@ export default function App() {
     setData((current) => ({ ...current, gatheringDrafts: [...current.gatheringDrafts.filter((item) => item.id !== draft.id), draft] }));
     if (shared(draft.groupId)) runCloud(saveCloudDraft(draft.groupId, draft, previous));
   };
-  const createEvent = (name: string, groupId: string) => {
-    const unitIds = new Set(data.billingUnits.filter((unit) => unit.groupId === groupId).map((unit) => unit.id));
-    const event: GatheringDraft = { id: createId(), groupId, name, date: today(), attendance: data.members.filter((member) => member.active && unitIds.has(member.billingUnitId)).map((member) => ({ memberId: member.id, present: true })), expenses: [], updatedAt: new Date().toISOString() };
+  const createEvent = (name: string, familyId?: string) => {
+    if (!primaryGroup) return;
+    const familyMembers = familyId ? data.members.filter((member) => member.billingUnitId === familyId && member.active) : [];
+    const event: GatheringDraft = { id: createId(), groupId: primaryGroup.id, name, date: today(), familyIds: familyId ? [familyId] : [], attendance: familyMembers.map((member) => ({ memberId: member.id, present: true })), expenses: [], updatedAt: new Date().toISOString() };
     setData((current) => ({ ...current, gatheringDrafts: [...current.gatheringDrafts, event] }));
-    if (shared(groupId)) runCloud(saveCloudDraft(groupId, event));
+    if (shared(event.groupId)) runCloud(saveCloudDraft(event.groupId, event));
     setScreen({ name: "gathering", eventId: event.id });
   };
-  const updateEvent = (id: string, name: string, groupId: string) => {
-    const previous = data.gatheringDrafts.find((event) => event.id === id);
-    if (!previous) return;
-    const familyChanged = previous.groupId !== groupId;
-    const unitIds = new Set(data.billingUnits.filter((unit) => unit.groupId === groupId).map((unit) => unit.id));
-    const updated: GatheringDraft = { ...previous, name, groupId, updatedAt: new Date().toISOString(), ...(familyChanged ? { attendance: data.members.filter((member) => member.active && unitIds.has(member.billingUnitId)).map((member) => ({ memberId: member.id, present: true })), expenses: [] } : {}) };
-    setData((current) => ({ ...current, gatheringDrafts: current.gatheringDrafts.map((event) => event.id === id ? updated : event) }));
-    if (familyChanged) {
-      if (shared(previous.groupId) || shared(groupId)) runCloud((async () => {
-        if (shared(previous.groupId)) await clearCloudDraft(id);
-        if (shared(groupId)) await saveCloudDraft(groupId, updated);
-      })());
-    } else if (shared(groupId)) runCloud(saveCloudDraft(groupId, updated, previous));
+  const assignFamily = (familyId: string, eventId: string) => {
+    const event = data.gatheringDrafts.find((item) => item.id === eventId);
+    if (!event || event.familyIds.includes(familyId)) return;
+    const familyMembers = data.members.filter((member) => member.billingUnitId === familyId && member.active);
+    const updated: GatheringDraft = { ...event, familyIds: [...event.familyIds, familyId], attendance: [...event.attendance, ...familyMembers.map((member) => ({ memberId: member.id, present: true }))], updatedAt: new Date().toISOString() };
+    saveEvent(updated);
+  };
+  const createFamily = (family: BillingUnit, members: Member[]) => {
+    setData((current) => ({ ...current, billingUnits: [...current.billingUnits, family], members: [...current.members, ...members] }));
+    if (shared(family.groupId)) runCloud((async () => { await saveCloudUnit(family); for (const member of members) await saveCloudMember(family.groupId, member); })());
   };
   const deleteEvent = (id: string) => {
     const event = data.gatheringDrafts.find((item) => item.id === id);
@@ -120,29 +109,21 @@ export default function App() {
         connection = { groupId, inviteToken, role: "owner" };
         setData((current) => ({ ...current, sharedGroups: [...current.sharedGroups, connection!] }));
       }
-      if (!connection.inviteToken) { setCloudMessage(language === "he" ? "המשפחה משותפת. רק הבעלים יכול להפיץ קישור." : "This family is shared. Only the owner can share its link."); setCloudStatus("synced"); return; }
+      if (!connection.inviteToken) { setCloudMessage(language === "he" ? "המאגר משותף. רק הבעלים יכול להפיץ קישור." : "This repository is shared. Only the owner can share its link."); setCloudStatus("synced"); return; }
       const url = invitationUrl(connection.inviteToken);
-      if (navigator.share) await navigator.share({ title: data.groups.find((group) => group.id === groupId)?.name, url });
-      else await navigator.clipboard.writeText(url);
-      setCloudMessage(language === "he" ? "קישור השיתוף מוכן" : "Share link ready");
-      setCloudStatus("synced");
+      if (navigator.share) await navigator.share({ title: language === "he" ? "אירועים משותפים" : "Shared events", url }); else await navigator.clipboard.writeText(url);
+      setCloudMessage(language === "he" ? "קישור השיתוף מוכן" : "Share link ready"); setCloudStatus("synced");
     } catch { setCloudStatus("error"); setCloudMessage(language === "he" ? "לא הצלחנו להפעיל שיתוף כרגע" : "Could not enable sharing"); }
   };
 
   if (screen.name === "settings") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={(settings) => setData((current) => ({ ...current, settings }))} onBack={() => setScreen({ name: "home" })} />;
 
-  if (screen.name === "families") return <FamilyHome groups={data.groups} units={data.billingUnits} members={data.members} language={language} onBack={() => setScreen({ name: "home" })} onCreate={(name) => setData((current) => ({ ...current, groups: [...current.groups, { id: createId(), name }] }))} onRename={(id, name) => { const group = data.groups.find((item) => item.id === id); if (!group) return; const updated = { ...group, name }; setData((current) => ({ ...current, groups: current.groups.map((item) => item.id === id ? updated : item) })); if (shared(id)) runCloud(saveCloudGroup(updated)); }} onDelete={(id) => { const unitIds = new Set(data.billingUnits.filter((unit) => unit.groupId === id).map((unit) => unit.id)); setData((current) => ({ ...current, groups: current.groups.filter((group) => group.id !== id), billingUnits: current.billingUnits.filter((unit) => unit.groupId !== id), members: current.members.filter((member) => !unitIds.has(member.billingUnitId)), gatheringDrafts: current.gatheringDrafts.filter((event) => event.groupId !== id), sharedGroups: current.sharedGroups.filter((item) => item.groupId !== id) })); if (shared(id)) runCloud(deleteCloudGroup(id)); }} onManage={(groupId) => setScreen({ name: "manage", groupId })} />;
+  if (screen.name === "families" && primaryGroup) return <GroupWorkspace group={primaryGroup} units={repositoryFamilies} members={data.members} events={data.gatheringDrafts} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "home" })} onAddUnit={(name) => { const family = { id: createId(), groupId: primaryGroup.id, name, order: repositoryFamilies.length }; setData((current) => ({ ...current, billingUnits: [...current.billingUnits, family] })); if (shared(primaryGroup.id)) runCloud(saveCloudUnit(family)); }} onRenameUnit={(id, name) => { const family = data.billingUnits.find((item) => item.id === id); if (!family) return; const updated = { ...family, name }; setData((current) => ({ ...current, billingUnits: current.billingUnits.map((item) => item.id === id ? updated : item) })); if (shared(primaryGroup.id)) runCloud(saveCloudUnit(updated)); }} onDeleteUnit={(id) => { if (data.gatheringDrafts.some((event) => event.familyIds.includes(id))) return; setData((current) => ({ ...current, billingUnits: current.billingUnits.filter((unit) => unit.id !== id), members: current.members.filter((member) => member.billingUnitId !== id) })); if (shared(primaryGroup.id)) runCloud(deleteCloudUnit(id)); }} onAddMember={(familyId, details) => { const member = { ...details, id: createId(), billingUnitId: familyId, order: data.members.filter((item) => item.billingUnitId === familyId).length }; setData((current) => ({ ...current, members: [...current.members, member] })); if (shared(primaryGroup.id)) runCloud(saveCloudMember(primaryGroup.id, member)); }} onUpdateMember={(id, details) => { const member = data.members.find((item) => item.id === id); if (!member) return; const updated = { ...member, ...details }; setData((current) => ({ ...current, members: current.members.map((item) => item.id === id ? updated : item) })); if (shared(primaryGroup.id)) runCloud(saveCloudMember(primaryGroup.id, updated)); }} onDeleteMember={(id) => { setData((current) => ({ ...current, members: current.members.filter((member) => member.id !== id) })); if (shared(primaryGroup.id)) runCloud(deleteCloudMember(id)); }} onAssignFamily={(familyId, eventId) => assignFamily(familyId, eventId)} onCreateEventWithFamily={(familyId, name) => createEvent(name, familyId)} />;
 
   if (screen.name === "gathering") {
     const draft = data.gatheringDrafts.find((event) => event.id === screen.eventId);
-    const group = draft && data.groups.find((item) => item.id === draft.groupId);
-    if (draft && group) return <GatheringScreen key={`${draft.id}:${draft.groupId}`} group={group} groups={data.groups} units={data.billingUnits.filter((unit) => unit.groupId === group.id)} members={data.members} settings={data.settings} language={language} draft={draft} onLanguageChange={setLanguage} onSave={saveEvent} onBack={() => setScreen({ name: "home" })} onEditGroup={() => setScreen({ name: "manage", groupId: group.id, returnToEventId: draft.id })} onGroupChange={(groupId, name) => updateEvent(draft.id, name, groupId)} />;
+    if (draft && primaryGroup) return <GatheringScreen key={draft.id} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} onLanguageChange={setLanguage} onSave={saveEvent} onCreateFamily={createFamily} onBack={() => setScreen({ name: "home" })} onEditGroup={() => setScreen({ name: "families" })} />;
   }
 
-  if (screen.name === "manage") {
-    const group = data.groups.find((item) => item.id === screen.groupId);
-    if (group) return <GroupWorkspace group={group} units={data.billingUnits.filter((unit) => unit.groupId === group.id)} members={data.members} language={language} returnToGathering={Boolean(screen.returnToEventId)} onLanguageChange={setLanguage} onBack={() => setScreen(screen.returnToEventId ? { name: "gathering", eventId: screen.returnToEventId } : { name: "families" })} onAddUnit={(name) => { const unit = { id: createId(), groupId: group.id, name, order: data.billingUnits.filter((item) => item.groupId === group.id).length }; setData((current) => ({ ...current, billingUnits: [...current.billingUnits, unit] })); if (shared(group.id)) runCloud(saveCloudUnit(unit)); }} onRenameUnit={(id, name) => { const unit = data.billingUnits.find((item) => item.id === id); if (!unit) return; const updated = { ...unit, name }; setData((current) => ({ ...current, billingUnits: current.billingUnits.map((item) => item.id === id ? updated : item) })); if (shared(group.id)) runCloud(saveCloudUnit(updated)); }} onDeleteUnit={(id) => { setData((current) => ({ ...current, billingUnits: current.billingUnits.filter((unit) => unit.id !== id), members: current.members.filter((member) => member.billingUnitId !== id) })); if (shared(group.id)) runCloud(deleteCloudUnit(id)); }} onAddMember={(unitId, details) => { const member = { ...details, id: createId(), billingUnitId: unitId, order: data.members.filter((item) => item.billingUnitId === unitId).length }; setData((current) => ({ ...current, members: [...current.members, member] })); if (shared(group.id)) runCloud(saveCloudMember(group.id, member)); }} onUpdateMember={(id, details) => { const member = data.members.find((item) => item.id === id); if (!member) return; const updated = { ...member, ...details }; setData((current) => ({ ...current, members: current.members.map((item) => item.id === id ? updated : item) })); if (shared(group.id)) runCloud(saveCloudMember(group.id, updated)); }} onDeleteMember={(id) => { setData((current) => ({ ...current, members: current.members.filter((member) => member.id !== id) })); if (shared(group.id)) runCloud(deleteCloudMember(id)); }} onStartGathering={screen.returnToEventId ? () => setScreen({ name: "gathering", eventId: screen.returnToEventId! }) : undefined} />;
-  }
-
-  return <GroupHome groups={data.groups} events={[...data.gatheringDrafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))} sharedGroups={data.sharedGroups} cloudStatus={cloudStatus} cloudMessage={cloudMessage} language={language} onLanguageChange={setLanguage} onCreate={createEvent} onUpdate={updateEvent} onDelete={deleteEvent} onStart={(eventId) => setScreen({ name: "gathering", eventId })} onManageFamily={(groupId, eventId) => setScreen({ name: "manage", groupId, returnToEventId: eventId })} onShare={(groupId) => { void shareGroup(groupId); }} onFamilies={() => setScreen({ name: "families" })} onSettings={() => setScreen({ name: "settings" })} />;
+  return <GroupHome events={[...data.gatheringDrafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))} families={repositoryFamilies} sharedGroups={data.sharedGroups} cloudStatus={cloudStatus} cloudMessage={cloudMessage} language={language} onLanguageChange={setLanguage} onCreate={(name) => createEvent(name)} onUpdate={(id, name) => { const event = data.gatheringDrafts.find((item) => item.id === id); if (event) saveEvent({ ...event, name, updatedAt: new Date().toISOString() }); }} onDelete={deleteEvent} onStart={(eventId) => setScreen({ name: "gathering", eventId })} onShare={(groupId) => { void shareGroup(groupId); }} onFamilies={() => setScreen({ name: "families" })} onSettings={() => setScreen({ name: "settings" })} />;
 }
