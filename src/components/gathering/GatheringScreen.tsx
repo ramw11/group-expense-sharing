@@ -52,7 +52,7 @@ export function GatheringScreen({ group, units, members, settings, language, dra
       setScanState({ status: "scanning", progress: 0 });
       const imageUrl = await prepareReceiptImage(file);
       setReceiptUrl(imageUrl);
-      const amount = await recognizeReceiptAmount(imageUrl, (progress) => setScanState({ status: "scanning", progress }));
+      const amount = await recognizeReceiptAmount(file, (progress) => setScanState({ status: "scanning", progress }));
       if (amount !== undefined) { setExpenseAmount(amount.toFixed(2)); setScanState({ status: "found", progress: 100 }); }
       else setScanState({ status: "missing", progress: 100 });
     } catch { setScanState({ status: "failed", progress: 0 }); }
