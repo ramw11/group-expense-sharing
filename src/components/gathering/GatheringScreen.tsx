@@ -1,20 +1,26 @@
-import { ArrowLeft, Check, CheckCircle2, Copy, Plus, ReceiptText, RotateCcw, Trash2, UsersRound, WalletCards } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, Copy, Plus, ReceiptText, RotateCcw, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Attendance, BillingUnit, Expense, Group, Member, Settings } from "../../domain/models";
+import type { Attendance, BillingUnit, Expense, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
 import { calculateGathering, createSettlements } from "../../business/calculations";
+import { translate } from "../../i18n";
+import { prepareReceiptImage } from "../../utils/image";
+import { recognizeReceiptAmount } from "../../utils/receiptOcr";
+import { LanguageToggle } from "../ui/LanguageToggle";
 
 interface GatheringScreenProps {
   group: Group;
   units: BillingUnit[];
   members: Member[];
   settings: Settings;
+  language: Language;
+  onLanguageChange(language: Language): void;
   onBack(): void;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function GatheringScreen({ group, units, members, settings, onBack }: GatheringScreenProps) {
+export function GatheringScreen({ group, units, members, settings, language, onLanguageChange, onBack }: GatheringScreenProps) {
   const activeMembers = useMemo(() => members.filter((member) => member.active).sort((a, b) => a.order - b.order), [members]);
   const [date, setDate] = useState(today);
   const [attendance, setAttendance] = useState<Attendance[]>(() => activeMembers.map((member) => ({ memberId: member.id, present: true })));
@@ -22,6 +28,8 @@ export function GatheringScreen({ group, units, members, settings, onBack }: Gat
   const [expenseUnitId, setExpenseUnitId] = useState(units[0]?.id ?? "");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState<string>();
+  const [scanState, setScanState] = useState<{ status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number }>({ status: "idle", progress: 0 });
   const [copied, setCopied] = useState(false);
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const presentCount = presentIds.size;
@@ -30,39 +38,51 @@ export function GatheringScreen({ group, units, members, settings, onBack }: Gat
   const addExpense = () => {
     const amount = Number(expenseAmount);
     if (!expenseUnitId || !Number.isFinite(amount) || amount <= 0) return;
-    setExpenses((current) => [...current, { id: createId(), billingUnitId: expenseUnitId, amount, description: expenseDescription.trim() || undefined }]);
-    setExpenseAmount(""); setExpenseDescription("");
+    setExpenses((current) => [...current, { id: createId(), billingUnitId: expenseUnitId, amount, description: expenseDescription.trim() || undefined, receiptUrl }]);
+    setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
+  };
+  const scanReceipt = async (file?: File) => {
+    if (!file) return;
+    try {
+      setScanState({ status: "scanning", progress: 0 });
+      const imageUrl = await prepareReceiptImage(file);
+      setReceiptUrl(imageUrl);
+      const amount = await recognizeReceiptAmount(imageUrl, (progress) => setScanState({ status: "scanning", progress }));
+      if (amount !== undefined) { setExpenseAmount(amount.toFixed(2)); setScanState({ status: "found", progress: 100 }); }
+      else setScanState({ status: "missing", progress: 100 });
+    } catch { setScanState({ status: "failed", progress: 0 }); }
   };
   const totalPaid = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const calculation = calculateGathering({ date, units, members, attendance, expenses, settings });
   const settlements = createSettlements(calculation.unitSummaries);
-  const money = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: settings.currency, maximumFractionDigits: 2 }).format(value);
-  const unitName = (id: string) => units.find((unit) => unit.id === id)?.name ?? "Unknown";
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
+  const money = (value: number) => new Intl.NumberFormat(language === "he" ? "he-IL" : "en", { style: "currency", currency: settings.currency, maximumFractionDigits: 2 }).format(value);
+  const unitName = (id: string) => units.find((unit) => unit.id === id)?.name ?? t("unknownUnit");
   const report = [
     `${group.name} — ${date}`,
-    `Total: ${money(calculation.totalPaid)} | Weighted participants: ${calculation.totalWeight}`,
+    `${t("total")}: ${money(calculation.totalPaid)} | ${t("weightedParticipants")}: ${calculation.totalWeight}`,
     "",
-    ...calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => `${unitName(item.billingUnitId)}: paid ${money(item.paid)}, share ${money(item.share)}, balance ${item.balance >= 0 ? "+" : ""}${money(item.balance)}`),
+    ...calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => `${unitName(item.billingUnitId)}: ${t("paid")} ${money(item.paid)}, ${t("share")} ${money(item.share)}, ${t("balance")} ${item.balance >= 0 ? "+" : ""}${money(item.balance)}`),
     "",
-    "Settlement:",
-    ...(settlements.length ? settlements.map((item) => `${unitName(item.fromBillingUnitId)} pays ${unitName(item.toBillingUnitId)} ${money(item.amount)}`) : ["Everyone is settled." ]),
+    `${t("settlement")}:`,
+    ...(settlements.length ? settlements.map((item) => `${unitName(item.fromBillingUnitId)} ${t("pays")} ${unitName(item.toBillingUnitId)} ${money(item.amount)}`) : [t("everyoneSettled")]),
     settings.reportFooter,
   ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(report); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
-  const reset = () => { setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); };
+  const reset = () => { setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); };
 
   return (
     <div className="gathering-shell">
       <header className="gathering-topbar">
-        <button className="back-button light" onClick={onBack}><ArrowLeft size={19} /> Group setup</button>
+        <button className="back-button light" onClick={onBack}><ArrowLeft size={19} /> {t("backToEvents")}</button>
         <div className="gathering-brand"><span>Split</span><i /></div>
-        <label className="gathering-date"><span>Gathering date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <div className="gathering-controls"><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
       </header>
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{group.name}</p><h1>Who’s at<br />the table?</h1></div>
-          <div className="attendance-score"><strong>{presentCount}</strong><span>of {activeMembers.length}<br />attending</span></div>
+          <div><p className="eyebrow">{group.name}</p><h1>{t("whoIsHere")}</h1></div>
+          <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 
         <div className="gathering-layout">
@@ -82,37 +102,44 @@ export function GatheringScreen({ group, units, members, settings, onBack }: Gat
           </section>
 
           <aside className="gathering-rail">
-            <div className="rail-step active"><span>01</span><div><strong>Attendance</strong><small>Choose who joined</small></div></div>
-            <div className="rail-step"><span>02</span><div><strong>Expenses</strong><small>Add what was paid</small></div></div>
-            <div className="rail-step"><span>03</span><div><strong>Settle</strong><small>See the final split</small></div></div>
-            <div className="rail-note"><ReceiptText size={24} /><p>Everything in this gathering stays temporary until you reset it.</p></div>
+            <div className="rail-step active"><span>01</span><div><strong>{t("attendance")}</strong><small>{t("chooseJoined")}</small></div></div>
+            <div className="rail-step"><span>02</span><div><strong>{t("expenses")}</strong><small>{t("addPaid")}</small></div></div>
+            <div className="rail-step"><span>03</span><div><strong>{t("settle")}</strong><small>{t("finalSplit")}</small></div></div>
+            <div className="rail-note"><ReceiptText size={24} /><p>{t("temporaryNote")}</p></div>
           </aside>
         </div>
 
         <section className="expense-section">
-          <header><div><p className="eyebrow">Money in</p><h2>What was paid?</h2></div><div className="expense-total"><span>Total</span><strong>₪{totalPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></div></header>
+          <header><div><p className="eyebrow">{t("moneyIn")}</p><h2>{t("whatPaid")}</h2></div><div className="expense-total"><span>{t("total")}</span><strong>{money(totalPaid)}</strong></div></header>
           <div className="expense-grid">
             <div className="expense-entry">
-              <label><span>Paid by</span><select value={expenseUnitId} onChange={(event) => setExpenseUnitId(event.target.value)}>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
-              <label><span>Amount</span><input type="number" min="0" step="0.01" inputMode="decimal" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0.00" /></label>
-              <label className="expense-description"><span>Description <i>optional</i></span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addExpense()} placeholder="Groceries, dinner, tickets…" /></label>
-              <button className="expense-add" onClick={addExpense}><Plus size={19} /> Add expense</button>
+              <label><span>{t("paidBy")}</span><select value={expenseUnitId} onChange={(event) => setExpenseUnitId(event.target.value)}>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
+              <label><span>{t("amount")}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0.00" /></label>
+              <div className="receipt-capture">
+                <input className="sr-only" id="receipt-photo" type="file" accept="image/*" capture="environment" onChange={(event) => { void scanReceipt(event.target.files?.[0]); event.target.value = ""; }} />
+                {receiptUrl ? <img src={receiptUrl} alt={t("receipt")} /> : <div className="receipt-placeholder"><ReceiptText size={26} /></div>}
+                <div><label className="receipt-button" htmlFor="receipt-photo"><Camera size={18} /> {receiptUrl ? t("changeReceipt") : t("takeReceipt")}</label><small>{scanState.status === "scanning" ? `${t("scanningReceipt")} ${scanState.progress}%` : scanState.status === "found" ? t("receiptAmountFound") : scanState.status === "missing" ? t("receiptAmountMissing") : scanState.status === "failed" ? t("receiptScanFailed") : `${t("cameraHint")} ${t("ocrFirstUse")}`}</small></div>
+                {receiptUrl && <button className="receipt-remove" aria-label={t("removeReceipt")} onClick={() => { setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); }}><X size={17} /></button>}
+                {scanState.status === "scanning" && <div className="ocr-progress" style={{ width: `${scanState.progress}%` }} />}
+              </div>
+              <label className="expense-description"><span>{t("description")} <i>{t("optional")}</i></span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addExpense()} placeholder={t("descPlaceholder")} /></label>
+              <button className="expense-add" onClick={addExpense} disabled={scanState.status === "scanning"}><Plus size={19} /> {t("addExpense")}</button>
             </div>
             <div className="expense-list">
-              {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>No expenses yet</strong><span>Add the first payment to start the live total.</span></div> : expenses.map((expense) => {
+              {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noExpenses")}</strong><span>{t("noExpensesCopy")}</span></div> : expenses.map((expense) => {
                 const unit = units.find((item) => item.id === expense.billingUnitId);
-                return <article key={expense.id}><div className="expense-symbol">₪</div><div><strong>{expense.description ?? "Expense"}</strong><span>{unit?.name ?? "Unknown unit"}</span></div><b>₪{expense.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b><button aria-label="Delete expense" onClick={() => setExpenses((current) => current.filter((item) => item.id !== expense.id))}><Trash2 size={17} /></button></article>;
+                return <article key={expense.id}>{expense.receiptUrl ? <img className="expense-receipt-thumb" src={expense.receiptUrl} alt={t("receipt")} /> : <div className="expense-symbol">₪</div>}<div><strong>{expense.description ?? t("expense")}</strong><span>{unit?.name ?? t("unknownUnit")}</span></div><b>{money(expense.amount)}</b><button aria-label={t("deleteExpense")} onClick={() => setExpenses((current) => current.filter((item) => item.id !== expense.id))}><Trash2 size={17} /></button></article>;
               })}
             </div>
           </div>
         </section>
 
         <section className="settlement-section">
-          <header><div><p className="eyebrow">The finish line</p><h2>Settled, simply.</h2></div><div className="settlement-actions"><button className="copy-button" onClick={copyReport}>{copied ? <CheckCircle2 size={19} /> : <Copy size={19} />}{copied ? "Copied" : "Copy report"}</button><button className="reset-button" onClick={reset}><RotateCcw size={18} /> Reset</button></div></header>
-          {calculation.totalWeight === 0 ? <div className="calculation-empty">Choose at least one attendee to calculate shares.</div> : calculation.totalPaid === 0 ? <div className="calculation-empty">Add an expense and the settlement will appear here instantly.</div> : <>
-            <div className="summary-metrics"><article><span>Total spent</span><strong>{money(calculation.totalPaid)}</strong></article><article><span>Total weight</span><strong>{calculation.totalWeight.toLocaleString()}</strong></article><article><span>Per full share</span><strong>{money(calculation.costPerWeight)}</strong></article></div>
-            <div className="settlement-grid"><div className="balance-table"><div className="balance-head"><span>Billing unit</span><span>Paid</span><span>Share</span><span>Balance</span></div>{calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => <div className="balance-row" key={item.billingUnitId}><strong>{unitName(item.billingUnitId)}</strong><span>{money(item.paid)}</span><span>{money(item.share)}</span><b className={item.balance >= 0 ? "positive" : "negative"}>{item.balance >= 0 ? "+" : ""}{money(item.balance)}</b></div>)}</div>
-              <aside className="payments-card"><p className="section-kicker">Who pays whom</p>{settlements.length === 0 ? <div className="all-set"><Check size={25} /><strong>All settled</strong></div> : settlements.map((item, index) => <div className="payment-line" key={`${item.fromBillingUnitId}-${item.toBillingUnitId}`}><span>{index + 1}</span><p><strong>{unitName(item.fromBillingUnitId)}</strong> pays <strong>{unitName(item.toBillingUnitId)}</strong></p><b>{money(item.amount)}</b></div>)}</aside>
+          <header><div><p className="eyebrow">{t("finishLine")}</p><h2>{t("settledSimply")}</h2></div><div className="settlement-actions"><button className="copy-button" onClick={copyReport}>{copied ? <CheckCircle2 size={19} /> : <Copy size={19} />}{copied ? t("copied") : t("copyReport")}</button><button className="reset-button" onClick={reset}><RotateCcw size={18} /> {t("reset")}</button></div></header>
+          {calculation.totalWeight === 0 ? <div className="calculation-empty">{t("chooseAttendee")}</div> : calculation.totalPaid === 0 ? <div className="calculation-empty">{t("addExpensePrompt")}</div> : <>
+            <div className="summary-metrics"><article><span>{t("totalSpent")}</span><strong>{money(calculation.totalPaid)}</strong></article><article><span>{t("totalWeight")}</span><strong>{calculation.totalWeight.toLocaleString()}</strong></article><article><span>{t("perShare")}</span><strong>{money(calculation.costPerWeight)}</strong></article></div>
+            <div className="settlement-grid"><div className="balance-table"><div className="balance-head"><span>{t("billingUnit")}</span><span>{t("paid")}</span><span>{t("share")}</span><span>{t("balance")}</span></div>{calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => <div className="balance-row" key={item.billingUnitId}><strong>{unitName(item.billingUnitId)}</strong><span>{money(item.paid)}</span><span>{money(item.share)}</span><b className={item.balance >= 0 ? "positive" : "negative"}>{item.balance >= 0 ? "+" : ""}{money(item.balance)}</b></div>)}</div>
+              <aside className="payments-card"><p className="section-kicker">{t("whoPaysWhom")}</p>{settlements.length === 0 ? <div className="all-set"><Check size={25} /><strong>{t("allSettled")}</strong></div> : settlements.map((item, index) => <div className="payment-line" key={`${item.fromBillingUnitId}-${item.toBillingUnitId}`}><span>{index + 1}</span><p><strong>{unitName(item.fromBillingUnitId)}</strong> {t("pays")} <strong>{unitName(item.toBillingUnitId)}</strong></p><b>{money(item.amount)}</b></div>)}</aside>
             </div>
           </>}
         </section>

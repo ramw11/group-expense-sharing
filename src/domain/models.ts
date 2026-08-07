@@ -28,6 +28,7 @@ export interface Expense {
   billingUnitId: Id;
   description?: string;
   amount: number;
+  receiptUrl?: string;
 }
 
 export interface Attendance {
@@ -37,8 +38,10 @@ export interface Attendance {
 
 export type WeightMode = "automatic" | "manual";
 export type RoundingMode = "none" | "nearest-0.5" | "nearest-1";
+export type Language = "he" | "en";
 
 export interface Settings {
+  language: Language;
   currency: string;
   childAgeThreshold: number;
   childWeight: number;

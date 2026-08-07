@@ -1,4 +1,4 @@
-import { emptyPersistentData } from "../domain/defaults";
+import { defaultSettings, emptyPersistentData } from "../domain/defaults";
 import type { PersistentData } from "../domain/models";
 import type { AppStorage } from "./storage";
 
@@ -16,7 +16,7 @@ export const localAppStorage: AppStorage = {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return emptyPersistentData();
       const parsed: unknown = JSON.parse(raw);
-      return isPersistentData(parsed) ? parsed : emptyPersistentData();
+      return isPersistentData(parsed) ? { ...parsed, settings: { ...defaultSettings, ...parsed.settings } } : emptyPersistentData();
     } catch {
       return emptyPersistentData();
     }

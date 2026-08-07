@@ -2,7 +2,7 @@
 
 A polished, offline-first Progressive Web App for splitting gathering expenses fairly across families, couples, individuals, teams, or any other group.
 
-The app stores reusable group data on the device and keeps each gathering temporary. There is no backend, account, or network dependency. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
+The app stores reusable group data on the device and keeps each gathering temporary. There is no backend or account. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
 
 ## Features
 
@@ -13,15 +13,17 @@ The app stores reusable group data on the device and keeps each gathering tempor
 - Manual participant weights
 - Touch-friendly attendance selection
 - Multiple expenses per billing unit
+- Camera-based receipt capture with on-device OCR amount detection
 - Instant weighted-share and balance calculations
 - Suggested payments between billing units
 - Copyable settlement report
 - Configurable currency, rounding, child threshold, child weight, and report footer
 - LocalStorage persistence for groups, billing units, members, and settings
 - Installable PWA with offline support
+- Hebrew-first interface with an English option and full RTL support
 - Responsive mobile and desktop interface
 
-Receipt scanning, cloud sync, accounts, shared editing, payment integrations, exports, and multiple languages are intentionally outside the v1.0 MVP.
+Cloud sync, accounts, shared editing, payment integrations, and exports are intentionally outside the v1.0 MVP.
 
 ## Architecture
 
@@ -77,4 +79,4 @@ In the repository settings, select **GitHub Actions** as the GitHub Pages source
 
 ## Data and privacy
 
-All persistent data stays in the browser's LocalStorage on the current device. Clearing site data removes it. No information is sent to a server.
+All persistent data stays in the browser's LocalStorage on the current device. Receipt photos and OCR processing stay in the browser and are discarded with the gathering. The OCR language model may be downloaded on the first scan and is then cached by the OCR engine. Clearing site data removes saved app data.

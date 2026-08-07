@@ -1,6 +1,7 @@
 import type { PersistentData, Settings } from "./models";
 
 export const defaultSettings: Settings = {
+  language: "he",
   currency: "ILS",
   childAgeThreshold: 12,
   childWeight: 0.5,
