@@ -56,7 +56,14 @@ export interface PersistentData {
   billingUnits: BillingUnit[];
   members: Member[];
   gatheringDrafts: GatheringDraft[];
+  sharedGroups: SharedGroupConnection[];
   settings: Settings;
+}
+
+export interface SharedGroupConnection {
+  groupId: Id;
+  inviteToken?: string;
+  role: "owner" | "editor";
 }
 
 export interface GatheringDraft {

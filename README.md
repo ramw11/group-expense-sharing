@@ -1,6 +1,6 @@
 # Group Expense Sharing
 
-A polished, offline-first Progressive Web App for splitting gathering expenses fairly across families, couples, individuals, teams, or any other group.
+A polished, offline-first Progressive Web App for splitting gathering expenses fairly across families, couples, individuals, teams, or any other group, with optional shared groups powered by Supabase.
 
 The app stores reusable group data on the device and keeps each gathering temporary. There is no backend or account. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
 
@@ -21,6 +21,7 @@ The app stores reusable group data on the device and keeps each gathering tempor
 - Copyable settlement report
 - Configurable currency, rounding, child threshold, child weight, and report footer
 - LocalStorage persistence for groups, billing units, members, and settings
+- Shareable group links and real-time multi-device synchronization
 - Installable PWA with offline support
 - Hebrew-first interface with an English option and full RTL support
 - Responsive mobile and desktop interface
@@ -77,8 +78,10 @@ The production output is written to `dist/`.
 
 The workflow in `.github/workflows/deploy-pages.yml` tests, lints, builds, and deploys the application automatically whenever `main` is updated.
 
+The connected Supabase project uses the migrations in `supabase/migrations`. Anonymous sign-ins must be enabled under Authentication settings for passwordless group invitations.
+
 In the repository settings, select **GitHub Actions** as the GitHub Pages source. The Vite base path is derived automatically from the repository name during the workflow.
 
 ## Data and privacy
 
-All persistent data stays in the browser's LocalStorage on the current device. Receipt photos and OCR processing stay in the browser and are discarded with the gathering. The OCR language model may be downloaded on the first scan and is then cached by the OCR engine. Clearing site data removes saved app data.
+Unshared groups stay in the browser's LocalStorage. When a group is explicitly shared, its group data, events, attendance, expenses, and compressed receipt photos are synchronized to the connected Supabase project. OCR processing itself stays in the browser.

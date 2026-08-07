@@ -26,7 +26,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function GatheringScreen({ group, units, members, settings, language, draft, onLanguageChange, onSave, onClear, onBack, onEditGroup }: GatheringScreenProps) {
   const activeMembers = useMemo(() => members.filter((member) => member.active).sort((a, b) => a.order - b.order), [members]);
-  const [eventName, setEventName] = useState(() => draft?.name ?? "");
   const [date, setDate] = useState(() => draft?.date ?? today());
   const [attendance, setAttendance] = useState<Attendance[]>(() => activeMembers.map((member) => draft?.attendance.find((item) => item.memberId === member.id) ?? { memberId: member.id, present: true }));
   const [expenses, setExpenses] = useState<Expense[]>(() => draft?.expenses ?? []);
@@ -62,14 +61,14 @@ export function GatheringScreen({ group, units, members, settings, language, dra
   const calculation = calculateGathering({ date, units, members, attendance, expenses, settings });
   const settlements = createSettlements(calculation.unitSummaries);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
-  const currentDraft = (): GatheringDraft => ({ groupId: group.id, name: eventName.trim() || undefined, date, attendance, expenses, updatedAt: new Date().toISOString() });
+  const currentDraft = (): GatheringDraft => ({ groupId: group.id, date, attendance, expenses, updatedAt: new Date().toISOString() });
   const save = () => { onSave(currentDraft()); setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
   const saveAndBack = () => { onSave(currentDraft()); onBack(); };
   const saveAndEdit = () => { onSave(currentDraft()); onEditGroup(); };
   const money = (value: number) => new Intl.NumberFormat(language === "he" ? "he-IL" : "en", { style: "currency", currency: settings.currency, maximumFractionDigits: 2 }).format(value);
   const unitName = (id: string) => units.find((unit) => unit.id === id)?.name ?? t("unknownUnit");
   const report = [
-    `${eventName.trim() || group.name} — ${date}`,
+    `${group.name} — ${date}`,
     `${t("total")}: ${money(calculation.totalPaid)} | ${t("weightedParticipants")}: ${calculation.totalWeight}`,
     "",
     ...calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => `${unitName(item.billingUnitId)}: ${t("paid")} ${money(item.paid)}, ${t("share")} ${money(item.share)}, ${t("balance")} ${item.balance >= 0 ? "+" : ""}${money(item.balance)}`),
@@ -79,7 +78,7 @@ export function GatheringScreen({ group, units, members, settings, language, dra
     settings.reportFooter,
   ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(report); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
-  const reset = () => { setEventName(""); setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); onClear(); };
+  const reset = () => { setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); onClear(); };
 
   return (
     <div className="gathering-shell">
@@ -91,7 +90,7 @@ export function GatheringScreen({ group, units, members, settings, language, dra
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{group.name}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label></div>
+          <div><p className="eyebrow">{group.name}</p><h1>{t("whoIsHere")}</h1></div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 

@@ -22,5 +22,6 @@ export const emptyPersistentData = (): PersistentData => ({
     ...["רמי", "עדינה", "כפיר", "שני", "זהר", "אור", "שירה", "שי"].map((name, order) => ({ id: `member-yad-binyamin-${order}`, billingUnitId: "unit-yad-binyamin", name, active: true, order })),
   ],
   gatheringDrafts: [],
+  sharedGroups: [],
   settings: { ...defaultSettings },
 });
