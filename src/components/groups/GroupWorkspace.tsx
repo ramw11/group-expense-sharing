@@ -19,7 +19,7 @@ interface GroupWorkspaceProps {
   onAddMember(unitId: string, member: Omit<Member, "id" | "billingUnitId" | "order">): void;
   onUpdateMember(id: string, member: Partial<Member>): void;
   onDeleteMember(id: string): void;
-  onStartGathering(): void;
+  onStartGathering?: () => void;
 }
 
 const initialMemberForm = { name: "", birthDate: "", manualWeight: "", notes: "", active: true };
@@ -65,7 +65,7 @@ export function GroupWorkspace({ group, units, members, language, returnToGather
   return (
     <div className="page-shell workspace">
       <div className="screen-tools"><button className="back-button" onClick={onBack}><ArrowLeft size={19} /> {returnToGathering ? t("returnToEvent") : t("allEvents")}</button><LanguageToggle language={language} onChange={onLanguageChange} /></div>
-      <header className="workspace-heading"><div><p className="eyebrow">{t("groupSetup")}</p><h1>{group.name}</h1></div><div className="workspace-actions"><div className="stat-stamp"><strong>{members.length}</strong><span>{t("peopleReady")}</span></div><button className="start-button" onClick={onStartGathering}>{t("startGathering")} <ArrowRight size={20} /></button></div></header>
+      <header className="workspace-heading"><div><p className="eyebrow">{t("groupSetup")}</p><h1>{group.name}</h1></div><div className="workspace-actions"><div className="stat-stamp"><strong>{members.length}</strong><span>{t("peopleReady")}</span></div>{onStartGathering && <button className="start-button" onClick={onStartGathering}>{t("returnToEvent")} <ArrowRight size={20} /></button>}</div></header>
 
       <div className="workspace-columns">
         <section className="panel workspace-panel">

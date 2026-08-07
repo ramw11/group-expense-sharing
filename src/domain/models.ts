@@ -51,7 +51,7 @@ export interface Settings {
 }
 
 export interface PersistentData {
-  version: 1;
+  version: 2;
   groups: Group[];
   billingUnits: BillingUnit[];
   members: Member[];
@@ -67,8 +67,9 @@ export interface SharedGroupConnection {
 }
 
 export interface GatheringDraft {
+  id: Id;
   groupId: Id;
-  name?: string;
+  name: string;
   date: string;
   attendance: Attendance[];
   expenses: Expense[];

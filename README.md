@@ -2,11 +2,12 @@
 
 A polished, offline-first Progressive Web App for splitting gathering expenses fairly across families, couples, individuals, teams, or any other group, with optional shared groups powered by Supabase.
 
-The app stores reusable group data on the device and keeps each gathering temporary. There is no backend or account. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
+The app separates reusable family/group definitions from events. Each event has its own name, date, selected family, attendance, and expenses. Local use needs no account; optional anonymous Supabase sessions provide secure sharing and real-time collaboration. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
 
 ## Features
 
-- Multiple independent groups
+- Reusable families and groups, managed separately from events
+- Multiple independent events with a name, date, and selected family
 - Billing units for people who pay together
 - Member profiles with active status, birth date, notes, and optional manual weight
 - Automatic child weighting based on the gathering date
@@ -26,7 +27,7 @@ The app stores reusable group data on the device and keeps each gathering tempor
 - Hebrew-first interface with an English option and full RTL support
 - Responsive mobile and desktop interface
 
-Cloud sync, accounts, shared editing, payment integrations, and exports are intentionally outside the v1.0 MVP.
+Named user accounts, payment integrations, and exports are intentionally outside the v1.0 MVP.
 
 ## Architecture
 
@@ -40,7 +41,7 @@ src/
 └── utils/       Framework-independent utilities
 ```
 
-Attendance and expenses can be saved as a per-group draft and resumed later. Resetting an event clears its draft. Business functions do not import React or LocalStorage.
+Attendance and expenses are saved per event and can be resumed later. A family can be reused across multiple events. Business functions do not import React or LocalStorage.
 
 ## Installation
 
