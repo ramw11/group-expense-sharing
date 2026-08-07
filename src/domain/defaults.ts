@@ -7,7 +7,7 @@ export const defaultSettings: Settings = {
   childWeight: 0.5,
   weightMode: "automatic",
   roundingMode: "nearest-0.5",
-  reportFooter: "Thanks everyone!",
+  reportFooter: "תודה לכולם!",
 };
 
 export const emptyPersistentData = (): PersistentData => ({

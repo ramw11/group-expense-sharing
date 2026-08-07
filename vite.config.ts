@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon-180x180.png"],
       manifest: {
-        name: "Group Expense Sharing",
-        short_name: "Fair Share",
-        description: "Split group expenses simply, fairly, and offline.",
+        name: "חלוקת הוצאות קבוצתית",
+        short_name: "מתחלקים",
+        description: "חלוקת הוצאות קבוצתית, פשוטה והוגנת.",
         theme_color: "#182a20",
         background_color: "#f6f2e8",
         display: "standalone",
