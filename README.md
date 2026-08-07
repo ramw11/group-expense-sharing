@@ -13,6 +13,7 @@ The app stores reusable group data on the device and keeps each gathering tempor
 - Manual participant weights
 - Touch-friendly attendance selection
 - Resumable event drafts saved on the device
+- Custom names for individual events
 - Multiple expenses per billing unit
 - Camera-based receipt capture with on-device OCR amount detection
 - Instant weighted-share and balance calculations

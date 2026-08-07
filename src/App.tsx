@@ -50,7 +50,7 @@ export default function App() {
 
   return <GroupHome
     groups={data.groups}
-    draftGroupIds={data.gatheringDrafts.map((draft) => draft.groupId)}
+    drafts={data.gatheringDrafts}
     language={language}
     onLanguageChange={setLanguage}
     onCreate={(name) => setData((current) => ({ ...current, groups: [...current.groups, { id: createId(), name }] }))}

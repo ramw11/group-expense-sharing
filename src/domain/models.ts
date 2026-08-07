@@ -61,6 +61,7 @@ export interface PersistentData {
 
 export interface GatheringDraft {
   groupId: Id;
+  name?: string;
   date: string;
   attendance: Attendance[];
   expenses: Expense[];
