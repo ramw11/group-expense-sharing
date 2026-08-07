@@ -55,11 +55,14 @@ export interface PersistentData {
   groups: Group[];
   billingUnits: BillingUnit[];
   members: Member[];
+  gatheringDrafts: GatheringDraft[];
   settings: Settings;
 }
 
 export interface GatheringDraft {
+  groupId: Id;
   date: string;
   attendance: Attendance[];
   expenses: Expense[];
+  updatedAt: string;
 }

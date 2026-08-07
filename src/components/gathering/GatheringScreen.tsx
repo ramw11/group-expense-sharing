@@ -1,6 +1,6 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, Copy, Plus, ReceiptText, RotateCcw, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, Copy, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Attendance, BillingUnit, Expense, Group, Language, Member, Settings } from "../../domain/models";
+import type { Attendance, BillingUnit, Expense, GatheringDraft, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
 import { calculateGathering, createSettlements } from "../../business/calculations";
 import { translate } from "../../i18n";
@@ -14,23 +14,28 @@ interface GatheringScreenProps {
   members: Member[];
   settings: Settings;
   language: Language;
+  draft?: GatheringDraft;
   onLanguageChange(language: Language): void;
+  onSave(draft: GatheringDraft): void;
+  onClear(): void;
   onBack(): void;
+  onEditGroup(): void;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function GatheringScreen({ group, units, members, settings, language, onLanguageChange, onBack }: GatheringScreenProps) {
+export function GatheringScreen({ group, units, members, settings, language, draft, onLanguageChange, onSave, onClear, onBack, onEditGroup }: GatheringScreenProps) {
   const activeMembers = useMemo(() => members.filter((member) => member.active).sort((a, b) => a.order - b.order), [members]);
-  const [date, setDate] = useState(today);
-  const [attendance, setAttendance] = useState<Attendance[]>(() => activeMembers.map((member) => ({ memberId: member.id, present: true })));
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [date, setDate] = useState(() => draft?.date ?? today());
+  const [attendance, setAttendance] = useState<Attendance[]>(() => activeMembers.map((member) => draft?.attendance.find((item) => item.memberId === member.id) ?? { memberId: member.id, present: true }));
+  const [expenses, setExpenses] = useState<Expense[]>(() => draft?.expenses ?? []);
   const [expenseUnitId, setExpenseUnitId] = useState(units[0]?.id ?? "");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [receiptUrl, setReceiptUrl] = useState<string>();
   const [scanState, setScanState] = useState<{ status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number }>({ status: "idle", progress: 0 });
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const presentCount = presentIds.size;
 
@@ -56,6 +61,10 @@ export function GatheringScreen({ group, units, members, settings, language, onL
   const calculation = calculateGathering({ date, units, members, attendance, expenses, settings });
   const settlements = createSettlements(calculation.unitSummaries);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
+  const currentDraft = (): GatheringDraft => ({ groupId: group.id, date, attendance, expenses, updatedAt: new Date().toISOString() });
+  const save = () => { onSave(currentDraft()); setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
+  const saveAndBack = () => { onSave(currentDraft()); onBack(); };
+  const saveAndEdit = () => { onSave(currentDraft()); onEditGroup(); };
   const money = (value: number) => new Intl.NumberFormat(language === "he" ? "he-IL" : "en", { style: "currency", currency: settings.currency, maximumFractionDigits: 2 }).format(value);
   const unitName = (id: string) => units.find((unit) => unit.id === id)?.name ?? t("unknownUnit");
   const report = [
@@ -69,14 +78,14 @@ export function GatheringScreen({ group, units, members, settings, language, onL
     settings.reportFooter,
   ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(report); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
-  const reset = () => { setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); };
+  const reset = () => { setDate(today()); setAttendance(activeMembers.map((member) => ({ memberId: member.id, present: true }))); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); onClear(); };
 
   return (
     <div className="gathering-shell">
       <header className="gathering-topbar">
-        <button className="back-button light" onClick={onBack}><ArrowLeft size={19} /> {t("backToEvents")}</button>
+        <div className="gathering-nav"><button className="back-button light" onClick={saveAndBack}><ArrowLeft size={19} /> {t("backToEvents")}</button><button className="edit-group-button" onClick={saveAndEdit}><Pencil size={17} /> {t("editGroup")}</button></div>
         <div className="gathering-brand"><span>Split</span><i /></div>
-        <div className="gathering-controls"><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
+        <div className="gathering-controls"><button className={`draft-save-button ${saved ? "saved" : ""}`} onClick={save}>{saved ? <Check size={17} /> : <Save size={17} />}{saved ? t("draftSaved") : t("saveDraft")}</button><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
       </header>
 
       <main className="gathering-main">

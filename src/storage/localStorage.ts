@@ -18,7 +18,7 @@ export const localAppStorage: AppStorage = {
       if (!raw) return emptyPersistentData();
       const parsed: unknown = JSON.parse(raw);
       if (!isPersistentData(parsed)) return emptyPersistentData();
-      const migrated = { ...parsed, settings: { ...defaultSettings, ...parsed.settings } };
+      const migrated: PersistentData = { ...parsed, gatheringDrafts: Array.isArray(parsed.gatheringDrafts) ? parsed.gatheringDrafts : [], settings: { ...defaultSettings, ...parsed.settings } };
       if (!localStorage.getItem(HEBREW_DEFAULT_MIGRATION_KEY)) {
         localStorage.setItem(HEBREW_DEFAULT_MIGRATION_KEY, "true");
         migrated.settings.language = "he";

@@ -21,5 +21,6 @@ export const emptyPersistentData = (): PersistentData => ({
     ...["מוטי", "יפעת", "הודיה", "מנחם", "הלל", "אלירז", "ארז", "רוני", "אריאל", "אוריה"].map((name, order) => ({ id: `member-nitzan-${order}`, billingUnitId: "unit-nitzan", name, active: true, order })),
     ...["רמי", "עדינה", "כפיר", "שני", "זהר", "אור", "שירה", "שי"].map((name, order) => ({ id: `member-yad-binyamin-${order}`, billingUnitId: "unit-yad-binyamin", name, active: true, order })),
   ],
+  gatheringDrafts: [],
   settings: { ...defaultSettings },
 });

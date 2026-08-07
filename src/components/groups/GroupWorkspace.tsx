@@ -10,6 +10,7 @@ interface GroupWorkspaceProps {
   units: BillingUnit[];
   members: Member[];
   language: Language;
+  returnToGathering?: boolean;
   onLanguageChange(language: Language): void;
   onBack(): void;
   onAddUnit(name: string): void;
@@ -23,7 +24,7 @@ interface GroupWorkspaceProps {
 
 const initialMemberForm = { name: "", birthDate: "", manualWeight: "", notes: "", active: true };
 
-export function GroupWorkspace({ group, units, members, language, onLanguageChange, onBack, onAddUnit, onRenameUnit, onDeleteUnit, onAddMember, onUpdateMember, onDeleteMember, onStartGathering }: GroupWorkspaceProps) {
+export function GroupWorkspace({ group, units, members, language, returnToGathering, onLanguageChange, onBack, onAddUnit, onRenameUnit, onDeleteUnit, onAddMember, onUpdateMember, onDeleteMember, onStartGathering }: GroupWorkspaceProps) {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(units[0]?.id ?? null);
@@ -63,7 +64,7 @@ export function GroupWorkspace({ group, units, members, language, onLanguageChan
 
   return (
     <div className="page-shell workspace">
-      <div className="screen-tools"><button className="back-button" onClick={onBack}><ArrowLeft size={19} /> {t("allEvents")}</button><LanguageToggle language={language} onChange={onLanguageChange} /></div>
+      <div className="screen-tools"><button className="back-button" onClick={onBack}><ArrowLeft size={19} /> {returnToGathering ? t("returnToEvent") : t("allEvents")}</button><LanguageToggle language={language} onChange={onLanguageChange} /></div>
       <header className="workspace-heading"><div><p className="eyebrow">{t("groupSetup")}</p><h1>{group.name}</h1></div><div className="workspace-actions"><div className="stat-stamp"><strong>{members.length}</strong><span>{t("peopleReady")}</span></div><button className="start-button" onClick={onStartGathering}>{t("startGathering")} <ArrowRight size={20} /></button></div></header>
 
       <div className="workspace-columns">

@@ -12,6 +12,7 @@ The app stores reusable group data on the device and keeps each gathering tempor
 - Automatic child weighting based on the gathering date
 - Manual participant weights
 - Touch-friendly attendance selection
+- Resumable event drafts saved on the device
 - Multiple expenses per billing unit
 - Camera-based receipt capture with on-device OCR amount detection
 - Instant weighted-share and balance calculations
@@ -37,7 +38,7 @@ src/
 └── utils/       Framework-independent utilities
 ```
 
-Attendance, expenses, and calculations are held only in memory and are discarded when a gathering is reset or left. Business functions do not import React or LocalStorage.
+Attendance and expenses can be saved as a per-group draft and resumed later. Resetting an event clears its draft. Business functions do not import React or LocalStorage.
 
 ## Installation
 
