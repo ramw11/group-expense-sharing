@@ -26,6 +26,7 @@ export interface Member {
 export interface Expense {
   id: Id;
   billingUnitId: Id;
+  reportedByMemberId?: Id;
   description?: string;
   amount: number;
   receiptUrl?: string;
@@ -51,7 +52,7 @@ export interface Settings {
 }
 
 export interface PersistentData {
-  version: 3;
+  version: 4;
   groups: Group[];
   billingUnits: BillingUnit[];
   members: Member[];
@@ -63,7 +64,7 @@ export interface PersistentData {
 export interface SharedGroupConnection {
   groupId: Id;
   inviteToken?: string;
-  role: "owner" | "editor";
+  role: "owner" | "participant";
 }
 
 export interface GatheringDraft {

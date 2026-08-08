@@ -6,14 +6,14 @@ const STORAGE_KEY = "group-expense-sharing:v1";
 const HEBREW_DEFAULT_MIGRATION_KEY = "group-expense-sharing:he-default-applied";
 
 type StoredData = Omit<PersistentData, "version" | "gatheringDrafts"> & {
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   gatheringDrafts?: Array<Partial<GatheringDraft> & { groupId: string; families?: Array<{ id: string }> }>;
 };
 
 const isStoredData = (value: unknown): value is StoredData => {
   if (!value || typeof value !== "object") return false;
   const data = value as Partial<StoredData>;
-  return (data.version === 1 || data.version === 2 || data.version === 3) && Array.isArray(data.groups) && Array.isArray(data.billingUnits) && Array.isArray(data.members) && !!data.settings;
+  return (data.version === 1 || data.version === 2 || data.version === 3 || data.version === 4) && Array.isArray(data.groups) && Array.isArray(data.billingUnits) && Array.isArray(data.members) && !!data.settings;
 };
 
 const migrate = (data: StoredData): PersistentData => {
@@ -27,7 +27,7 @@ const migrate = (data: StoredData): PersistentData => {
 
   return {
     ...data,
-    version: 3,
+    version: 4,
     groups: [primaryGroup],
     billingUnits,
     gatheringDrafts: drafts.map((draft, index) => {
@@ -47,7 +47,7 @@ const migrate = (data: StoredData): PersistentData => {
         updatedAt: draft.updatedAt ?? new Date().toISOString(),
       };
     }),
-    sharedGroups: Array.isArray(data.sharedGroups) ? data.sharedGroups.filter((connection) => connection.groupId === primaryGroup.id) : [],
+    sharedGroups: Array.isArray(data.sharedGroups) ? data.sharedGroups.filter((connection) => connection.groupId === primaryGroup.id).map((connection) => ({ ...connection, role: connection.role === "owner" ? "owner" as const : "participant" as const })) : [],
     settings: { ...defaultSettings, ...data.settings },
   };
 };

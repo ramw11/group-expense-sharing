@@ -1,4 +1,4 @@
-import type { BillingUnit, GatheringDraft, Group, Member, PersistentData } from "../domain/models";
+import type { BillingUnit, Expense, GatheringDraft, Group, Member, PersistentData } from "../domain/models";
 import { supabase, ensureAnonymousSession } from "./client";
 
 export interface CloudGroupSnapshot {
@@ -15,12 +15,12 @@ const randomToken = () => {
 
 const throwIfError = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
 
-async function uploadReceipt(groupId: string, eventId: string, expenseId: string, receiptUrl?: string) {
+async function uploadReceipt(groupId: string, eventId: string, expenseId: string, receiptUrl?: string, upsert = true) {
   if (!receiptUrl?.startsWith("data:")) return receiptUrl;
   const response = await fetch(receiptUrl);
   const blob = await response.blob();
   const path = `${groupId}/${eventId}/${expenseId}.jpg`;
-  const { error } = await supabase.storage.from("receipts").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+  const { error } = await supabase.storage.from("receipts").upload(path, blob, { contentType: "image/jpeg", upsert });
   throwIfError(error);
   return path;
 }
@@ -74,7 +74,7 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
   const [linksResult, attendanceResult, expensesResult] = await Promise.all([
     supabase.from("event_families").select("event_id,family_id").in("event_id", eventIds),
     supabase.from("attendance").select("event_id,member_id,present").in("event_id", eventIds),
-    supabase.from("expenses").select("id,event_id,billing_unit_id,description,amount,receipt_path").in("event_id", eventIds).is("deleted_at", null),
+    supabase.from("expenses").select("id,event_id,billing_unit_id,reported_by_member_id,description,amount,receipt_path").in("event_id", eventIds).is("deleted_at", null),
   ]);
   throwIfError(linksResult.error); throwIfError(attendanceResult.error); throwIfError(expensesResult.error);
   const drafts = await Promise.all(eventResult.data.map(async (event) => ({
@@ -85,7 +85,7 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
     updatedAt: event.updated_at,
     familyIds: event.families_linked ? (linksResult.data ?? []).filter((link) => link.event_id === event.id).map((link) => link.family_id) : units.map((family) => family.id),
     attendance: (attendanceResult.data ?? []).filter((item) => item.event_id === event.id).map((item) => ({ memberId: item.member_id, present: item.present })),
-    expenses: await Promise.all((expensesResult.data ?? []).filter((expense) => expense.event_id === event.id).map(async (expense) => ({ id: expense.id, billingUnitId: expense.billing_unit_id, description: expense.description ?? undefined, amount: Number(expense.amount), receiptUrl: await receiptUrl(expense.receipt_path) }))),
+    expenses: await Promise.all((expensesResult.data ?? []).filter((expense) => expense.event_id === event.id).map(async (expense) => ({ id: expense.id, billingUnitId: expense.billing_unit_id, reportedByMemberId: expense.reported_by_member_id ?? undefined, description: expense.description ?? undefined, amount: Number(expense.amount), receiptUrl: await receiptUrl(expense.receipt_path) }))),
   })));
   return { group, units, members, drafts };
 }
@@ -124,11 +124,28 @@ export async function saveCloudDraft(groupId: string, draft: GatheringDraft, pre
   if (removedMemberIds.length) throwIfError((await supabase.from("attendance").delete().eq("event_id", draft.id).in("member_id", removedMemberIds)).error);
   for (const expense of draft.expenses) {
     const path = await uploadReceipt(groupId, draft.id, expense.id, expense.receiptUrl);
-    throwIfError((await supabase.from("expenses").upsert({ id: expense.id, event_id: draft.id, group_id: groupId, billing_unit_id: expense.billingUnitId, description: expense.description, amount: expense.amount, receipt_path: path?.startsWith("http") ? undefined : path, updated_by: user.id, updated_at: draft.updatedAt, deleted_at: null })).error);
+    throwIfError((await supabase.from("expenses").upsert({ id: expense.id, event_id: draft.id, group_id: groupId, billing_unit_id: expense.billingUnitId, reported_by_member_id: expense.reportedByMemberId, description: expense.description, amount: expense.amount, receipt_path: path?.startsWith("http") ? undefined : path, updated_by: user.id, updated_at: draft.updatedAt, deleted_at: null })).error);
   }
   const currentIds = new Set(draft.expenses.map((expense) => expense.id));
   const removedIds = previous?.expenses.filter((expense) => !currentIds.has(expense.id)).map((expense) => expense.id) ?? [];
   if (removedIds.length) throwIfError((await supabase.from("expenses").update({ deleted_at: new Date().toISOString(), updated_by: user.id }).in("id", removedIds)).error);
+}
+
+export async function submitCloudExpense(groupId: string, eventId: string, expense: Expense) {
+  const user = await ensureAnonymousSession();
+  const path = await uploadReceipt(groupId, eventId, expense.id, expense.receiptUrl, false);
+  throwIfError((await supabase.from("expenses").insert({
+    id: expense.id,
+    event_id: eventId,
+    group_id: groupId,
+    billing_unit_id: expense.billingUnitId,
+    reported_by_member_id: expense.reportedByMemberId,
+    description: expense.description,
+    amount: expense.amount,
+    receipt_path: path?.startsWith("http") ? undefined : path,
+    updated_by: user.id,
+    updated_at: new Date().toISOString(),
+  })).error);
 }
 
 export async function clearCloudDraft(eventId: string) {

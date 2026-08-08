@@ -185,7 +185,8 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
             <div className="expense-list">
               {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noExpenses")}</strong><span>{t("noExpensesCopy")}</span></div> : expenses.map((expense) => {
                 const unit = units.find((item) => item.id === expense.billingUnitId);
-                return <article key={expense.id}>{expense.receiptUrl ? <img className="expense-receipt-thumb" src={expense.receiptUrl} alt={t("receipt")} /> : <div className="expense-symbol">₪</div>}<div><strong>{expense.description ?? t("expense")}</strong><span>{unit?.name ?? t("unknownUnit")}</span></div><b>{money(expense.amount)}</b><button aria-label={t("deleteExpense")} onClick={() => setExpenses((current) => current.filter((item) => item.id !== expense.id))}><Trash2 size={17} /></button></article>;
+                const reporter = repositoryMembers.find((member) => member.id === expense.reportedByMemberId);
+                return <article key={expense.id}>{expense.receiptUrl ? <img className="expense-receipt-thumb" src={expense.receiptUrl} alt={t("receipt")} /> : <div className="expense-symbol">₪</div>}<div><strong>{expense.description ?? t("expense")}</strong><span>{unit?.name ?? t("unknownUnit")}{reporter ? ` · ${t("reportedBy")} ${reporter.name}` : ""}</span></div><b>{money(expense.amount)}</b><button aria-label={t("deleteExpense")} onClick={() => setExpenses((current) => current.filter((item) => item.id !== expense.id))}><Trash2 size={17} /></button></article>;
               })}
             </div>
           </div>
