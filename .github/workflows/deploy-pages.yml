@@ -5,7 +5,7 @@ on:
     branches: [deployment]
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -17,6 +17,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Remove premature v1.0.0 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method DELETE "repos/${{ github.repository }}/git/refs/tags/v1.0.0" || true
       - name: Check out repository
         uses: actions/checkout@v7
       - name: Set up Node.js
