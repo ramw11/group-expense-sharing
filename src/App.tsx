@@ -125,7 +125,7 @@ export default function App() {
     await submitCloudExpense(event.groupId, event.id, expense);
     setData((current) => ({ ...current, gatheringDrafts: current.gatheringDrafts.map((item) => item.id === eventId ? { ...item, expenses: [...item.expenses, expense], updatedAt: new Date().toISOString() } : item) }));
   };
-  const shareGroup = async (groupId: string, pendingDraft?: GatheringDraft, eventId?: string) => {
+  const createShareLink = async (groupId: string, pendingDraft?: GatheringDraft, eventId?: string) => {
     try {
       setCloudStatus("syncing");
       const sourceData = pendingDraft ? { ...data, gatheringDrafts: [...data.gatheringDrafts.filter((item) => item.id !== pendingDraft.id), pendingDraft] } : data;
@@ -148,14 +148,13 @@ export default function App() {
           setData((current) => ({ ...current, sharedGroups: [connection!] }));
         }
       }
-      if (!connection.inviteToken) { setCloudMessage(language === "he" ? "המאגר משותף. רק הבעלים יכול להפיץ קישור." : "This repository is shared. Only the owner can share its link."); setCloudStatus("synced"); return; }
+      if (!connection.inviteToken) throw new Error("Only the owner can create a reporting link");
       const url = invitationUrl(connection.inviteToken, eventId);
-      const eventTitle = eventId ? sourceData.gatheringDrafts.find((item) => item.id === eventId)?.name : undefined;
-      if (navigator.share) await navigator.share({ title: eventTitle ?? (language === "he" ? "אירועים משותפים" : "Shared events"), url }); else await navigator.clipboard.writeText(url);
       setCloudMessage(language === "he" ? "קישור הדיווח מוכן לשליחה" : "The reporting link is ready to send"); setCloudStatus("synced");
+      return url;
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") { setCloudStatus("synced"); return; }
       setCloudStatus("error"); setCloudMessage(language === "he" ? "לא הצלחנו להפעיל שיתוף כרגע" : "Could not enable sharing");
+      throw error;
     }
   };
   const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={data.sharedGroups.length > 0} canManage={canManage} language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => setScreen({ name: "admin-home" })} />;
@@ -166,7 +165,7 @@ export default function App() {
 
   if (screen.name === "gathering") {
     const draft = data.gatheringDrafts.find((event) => event.id === screen.eventId);
-    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} shared={shared(primaryGroup.id)} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={(currentDraft) => { void shareGroup(currentDraft.groupId, currentDraft, currentDraft.id); }} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
+    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} shared={shared(primaryGroup.id)} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={(currentDraft) => createShareLink(currentDraft.groupId, currentDraft, currentDraft.id)} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
   }
 
   if (screen.name === "participant-expense") {
@@ -177,5 +176,5 @@ export default function App() {
 
   if (screen.name === "participant-home") return participantHome;
 
-  return <GroupHome events={[...data.gatheringDrafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))} families={repositoryFamilies} groupId={primaryGroup?.id ?? ""} shared={primaryGroup ? shared(primaryGroup.id) : false} cloudStatus={cloudStatus} cloudMessage={cloudMessage} language={language} onLanguageChange={setLanguage} onCreate={(name) => createEvent(name)} onUpdate={(id, name) => { const event = data.gatheringDrafts.find((item) => item.id === id); if (event) saveEvent({ ...event, name, updatedAt: new Date().toISOString() }); }} onDelete={deleteEvent} onStart={(eventId) => setScreen({ name: "gathering", eventId })} onShare={(groupId) => { void shareGroup(groupId); }} onFamilies={() => setScreen({ name: "families" })} onSettings={() => setScreen({ name: "settings" })} onParticipantHome={() => setScreen({ name: "participant-home" })} />;
+  return <GroupHome events={[...data.gatheringDrafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))} families={repositoryFamilies} groupId={primaryGroup?.id ?? ""} shared={primaryGroup ? shared(primaryGroup.id) : false} cloudStatus={cloudStatus} cloudMessage={cloudMessage} language={language} onLanguageChange={setLanguage} onCreate={(name) => createEvent(name)} onUpdate={(id, name) => { const event = data.gatheringDrafts.find((item) => item.id === id); if (event) saveEvent({ ...event, name, updatedAt: new Date().toISOString() }); }} onDelete={deleteEvent} onStart={(eventId) => setScreen({ name: "gathering", eventId })} onShare={(groupId) => createShareLink(groupId)} onFamilies={() => setScreen({ name: "families" })} onSettings={() => setScreen({ name: "settings" })} onParticipantHome={() => setScreen({ name: "participant-home" })} />;
 }

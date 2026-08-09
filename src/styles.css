@@ -106,6 +106,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
 .event-inline-share > span { display: flex; min-width: 0; flex-direction: column; }
 .event-inline-share strong { font-size: .86rem; }
 .event-inline-share small { margin-top: .15rem; color: currentColor; font-size: .68rem; opacity: .72; }
+.share-link-panel { display: grid; width: min(560px, 100%); gap: .65rem; margin-top: .7rem; padding: .85rem; border: 1.5px solid var(--lime); border-radius: 18px; color: white; background: #0d1b12; box-shadow: 4px 5px 0 #071009; }
+.page-shell > .share-link-panel { position: relative; z-index: 3; margin: .8rem 0 0 auto; color: var(--ink); border-color: var(--ink); background: var(--paper); box-shadow: 4px 5px 0 var(--ink); }
+.share-link-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; }
+.share-link-heading > div { display: flex; min-width: 0; flex-direction: column; }
+.share-link-heading span { margin-top: .15rem; color: #aeb8b0; font-size: .7rem; }
+.page-shell > .share-link-panel .share-link-heading span { color: var(--muted); }
+.share-link-heading > button { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 0; border-radius: 11px; color: inherit; background: #ffffff12; }
+.share-link-panel > input { width: 100%; min-width: 0; min-height: 45px; direction: ltr; padding: .55rem .7rem; border-color: #ffffff25; border-radius: 12px; color: white; background: #ffffff0a; font-size: .72rem; }
+.page-shell > .share-link-panel > input { color: var(--ink); border-color: #d9dbcf; background: white; }
+.share-link-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.share-link-actions button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: .4rem; padding: 0 .7rem; border: 1px solid currentColor; border-radius: 13px; color: inherit; background: transparent; font-size: .76rem; font-weight: 900; }
+.share-link-actions .share-link-primary { color: var(--ink); border-color: var(--lime); background: var(--lime); }
+.share-link-panel > p, .share-link-error { margin: 0; color: #ffad9c; font-size: .72rem; font-weight: 800; }
+.home-share-error { position: relative; z-index: 2; margin-top: .7rem; color: #9d382d; }
 .expense-header-actions { display: flex; align-items: flex-end; gap: .8rem; }
 .expense-form-toggle { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--lime); border-radius: 14px; color: var(--ink); background: var(--lime); font-size: .76rem; font-weight: 900; }
 .family-paid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; margin-top: 1rem; }

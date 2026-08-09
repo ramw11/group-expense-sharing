@@ -7,6 +7,7 @@ import { translate } from "../../i18n";
 import { prepareReceiptImage } from "../../utils/image";
 import { recognizeReceiptAmount } from "../../utils/receiptOcr";
 import { LanguageToggle } from "../ui/LanguageToggle";
+import { ShareLinkPanel } from "../ui/ShareLinkPanel";
 
 interface GatheringScreenProps {
   group: Group;
@@ -20,7 +21,7 @@ interface GatheringScreenProps {
   cloudMessage: string;
   onLanguageChange(language: Language): void;
   onSave(draft: GatheringDraft): void;
-  onShare(draft: GatheringDraft): void;
+  onShare(draft: GatheringDraft): Promise<string>;
   onCreateFamily(family: BillingUnit, members: Member[]): void;
   onBack(): void;
   onEditGroup(): void;
@@ -46,6 +47,9 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   const [saved, setSaved] = useState(false);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string>();
+  const [eventShareUrl, setEventShareUrl] = useState("");
+  const [eventShareLoading, setEventShareLoading] = useState(false);
+  const [eventShareFailed, setEventShareFailed] = useState(false);
   const [manualFamilyName, setManualFamilyName] = useState("");
   const [manualMemberNames, setManualMemberNames] = useState("");
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
@@ -122,6 +126,13 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
     settings.reportFooter,
   ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(report); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
+  const createEventLink = async () => {
+    setEventShareLoading(true);
+    setEventShareFailed(false);
+    try { setEventShareUrl(await onShare(currentDraft())); }
+    catch { setEventShareFailed(true); }
+    finally { setEventShareLoading(false); }
+  };
   const reset = () => {
     const nextAttendance = activeMembers.map((member) => ({ memberId: member.id, present: true }));
     const nextDate = today();
@@ -141,7 +152,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className={`event-inline-share ${shared ? "shared" : ""}`} disabled={cloudStatus === "syncing"} onClick={() => onShare(currentDraft())}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={20} /> : shared ? <Cloud size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button></div>
+          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className={`event-inline-share ${shared ? "shared" : ""}`} disabled={eventShareLoading || cloudStatus === "syncing"} onClick={() => { void createEventLink(); }}>{eventShareLoading ? <LoaderCircle className="spin" size={20} /> : shared ? <Cloud size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button>{eventShareFailed && <p className="share-link-error">{t("linkCreationFailed")}</p>}{eventShareUrl && <ShareLinkPanel url={eventShareUrl} title={eventName.trim() || t("unnamedEvent")} language={language} onClose={() => setEventShareUrl("")} />}</div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 
