@@ -45,7 +45,7 @@ export default function App() {
 
   useEffect(() => {
     if (handledInvite.current) return;
-    const match = window.location.hash.match(/^#join=([a-f0-9]{64})$/);
+    const match = window.location.hash.match(/^#join=([a-f0-9]{64})(?:&event=([^&]+))?$/);
     if (!match) return;
     handledInvite.current = true;
     queueMicrotask(() => setCloudStatus("syncing"));
@@ -53,7 +53,8 @@ export default function App() {
       const snapshot = await loadCloudGroup(groupId);
       setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [...current.sharedGroups.filter((item) => item.groupId !== groupId), { groupId, role: current.sharedGroups.some((item) => item.groupId === groupId && item.role === "owner") ? "owner" : "participant" }] }));
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      setScreen({ name: "participant-home" });
+      const requestedEventId = match[2] ? decodeURIComponent(match[2]) : undefined;
+      setScreen(requestedEventId && snapshot.drafts.some((draft) => draft.id === requestedEventId) ? { name: "participant-expense", eventId: requestedEventId } : { name: "participant-home" });
       setCloudStatus("synced"); setCloudMessage(language === "he" ? "הצטרפתם למאגר ולאירועים המשותפים" : "Joined the shared repository and events");
     }).catch(() => { setCloudStatus("error"); setCloudMessage(language === "he" ? "קישור ההצטרפות אינו תקין או שפג תוקפו" : "The invitation is invalid or expired"); });
   }, [language, setData]);
@@ -124,7 +125,7 @@ export default function App() {
     await submitCloudExpense(event.groupId, event.id, expense);
     setData((current) => ({ ...current, gatheringDrafts: current.gatheringDrafts.map((item) => item.id === eventId ? { ...item, expenses: [...item.expenses, expense], updatedAt: new Date().toISOString() } : item) }));
   };
-  const shareGroup = async (groupId: string, pendingDraft?: GatheringDraft) => {
+  const shareGroup = async (groupId: string, pendingDraft?: GatheringDraft, eventId?: string) => {
     try {
       setCloudStatus("syncing");
       const sourceData = pendingDraft ? { ...data, gatheringDrafts: [...data.gatheringDrafts.filter((item) => item.id !== pendingDraft.id), pendingDraft] } : data;
@@ -148,8 +149,9 @@ export default function App() {
         }
       }
       if (!connection.inviteToken) { setCloudMessage(language === "he" ? "המאגר משותף. רק הבעלים יכול להפיץ קישור." : "This repository is shared. Only the owner can share its link."); setCloudStatus("synced"); return; }
-      const url = invitationUrl(connection.inviteToken);
-      if (navigator.share) await navigator.share({ title: language === "he" ? "אירועים משותפים" : "Shared events", url }); else await navigator.clipboard.writeText(url);
+      const url = invitationUrl(connection.inviteToken, eventId);
+      const eventTitle = eventId ? sourceData.gatheringDrafts.find((item) => item.id === eventId)?.name : undefined;
+      if (navigator.share) await navigator.share({ title: eventTitle ?? (language === "he" ? "אירועים משותפים" : "Shared events"), url }); else await navigator.clipboard.writeText(url);
       setCloudMessage(language === "he" ? "קישור הדיווח מוכן לשליחה" : "The reporting link is ready to send"); setCloudStatus("synced");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") { setCloudStatus("synced"); return; }
@@ -164,7 +166,7 @@ export default function App() {
 
   if (screen.name === "gathering") {
     const draft = data.gatheringDrafts.find((event) => event.id === screen.eventId);
-    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} shared={shared(primaryGroup.id)} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={(currentDraft) => { void shareGroup(currentDraft.groupId, currentDraft); }} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
+    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} shared={shared(primaryGroup.id)} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={(currentDraft) => { void shareGroup(currentDraft.groupId, currentDraft, currentDraft.id); }} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
   }
 
   if (screen.name === "participant-expense") {

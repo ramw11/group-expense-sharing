@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, Cloud, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, ChevronDown, Cloud, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Attendance, BillingUnit, Expense, GatheringDraft, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
@@ -44,6 +44,8 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   const [scanState, setScanState] = useState<{ status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number }>({ status: "idle", progress: 0 });
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
+  const [expandedExpenseId, setExpandedExpenseId] = useState<string>();
   const [manualFamilyName, setManualFamilyName] = useState("");
   const [manualMemberNames, setManualMemberNames] = useState("");
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
@@ -86,6 +88,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
     if (!expenseUnitId || !Number.isFinite(amount) || amount <= 0) return;
     setExpenses((current) => [...current, { id: createId(), billingUnitId: expenseUnitId, amount, description: expenseDescription.trim() || undefined, receiptUrl }]);
     setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
+    setExpenseFormOpen(false);
   };
   const scanReceipt = async (file?: File) => {
     if (!file) return;
@@ -129,7 +132,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   return (
     <div className="gathering-shell">
       <header className="gathering-topbar">
-        <div className="gathering-nav"><button className="back-button light" onClick={saveAndBack}><ArrowLeft size={19} /> {t("backToEvents")}</button><button className="edit-group-button" onClick={saveAndEdit}><Pencil size={17} /> {t("editGroup")}</button><button className={`event-share-button ${shared ? "shared" : ""}`} disabled={cloudStatus === "syncing"} onClick={() => onShare(currentDraft())}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={17} /> : shared ? <Cloud size={17} /> : <Link2 size={17} />}{t("participantLink")}</button></div>
+        <div className="gathering-nav"><button className="back-button light" onClick={saveAndBack}><ArrowLeft size={19} /> {t("backToEvents")}</button><button className="edit-group-button" onClick={saveAndEdit}><Pencil size={17} /> {t("editGroup")}</button></div>
         <div className="gathering-brand"><span>Split</span><i /></div>
         <div className="gathering-controls"><button className={`draft-save-button ${saved ? "saved" : ""}`} onClick={save}>{saved ? <Check size={17} /> : <Save size={17} />}{saved ? t("draftSaved") : t("saveDraft")}</button><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
       </header>
@@ -138,7 +141,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label></div>
+          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className={`event-inline-share ${shared ? "shared" : ""}`} disabled={cloudStatus === "syncing"} onClick={() => onShare(currentDraft())}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={20} /> : shared ? <Cloud size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button></div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 
@@ -173,9 +176,10 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
         </div>
 
         <section className="expense-section">
-          <header><div><p className="eyebrow">{t("moneyIn")}</p><h2>{t("whatPaid")}</h2></div><div className="expense-total"><span>{t("total")}</span><strong>{money(totalPaid)}</strong></div></header>
-          <div className="expense-grid">
-            <div className="expense-entry">
+          <header><div><p className="eyebrow">{t("moneyIn")}</p><h2>{t("whatPaid")}</h2></div><div className="expense-header-actions"><div className="expense-total"><span>{t("total")}</span><strong>{money(totalPaid)}</strong></div><button className="expense-form-toggle" onClick={() => setExpenseFormOpen((open) => !open)}>{expenseFormOpen ? <X size={18} /> : <Plus size={18} />}{expenseFormOpen ? t("closeExpenseForm") : t("newExpense")}</button></div></header>
+          <div className="family-paid-summary" aria-label={t("paidByFamilies")}>{calculation.unitSummaries.map((summary) => <article key={summary.billingUnitId}><span>{unitName(summary.billingUnitId)}</span><strong>{money(summary.paid)}</strong></article>)}</div>
+          <div className={`expense-grid ${expenseFormOpen ? "" : "form-closed"}`}>
+            {expenseFormOpen && <div className="expense-entry">
               <label><span>{t("paidBy")}</span><select value={expenseUnitId} onChange={(event) => setExpenseUnitId(event.target.value)}>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
               <label><span>{t("amount")}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0.00" /></label>
               <div className="receipt-capture">
@@ -187,12 +191,13 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
               </div>
               <label className="expense-description"><span>{t("description")} <i>{t("optional")}</i></span><input value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addExpense()} placeholder={t("descPlaceholder")} /></label>
               <button className="expense-add" onClick={addExpense} disabled={scanState.status === "scanning"}><Plus size={19} /> {t("addExpense")}</button>
-            </div>
+            </div>}
             <div className="expense-list">
               {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noExpenses")}</strong><span>{t("noExpensesCopy")}</span></div> : expenses.map((expense) => {
                 const unit = units.find((item) => item.id === expense.billingUnitId);
                 const reporter = repositoryMembers.find((member) => member.id === expense.reportedByMemberId);
-                return <article key={expense.id}>{expense.receiptUrl ? <img className="expense-receipt-thumb" src={expense.receiptUrl} alt={t("receipt")} /> : <div className="expense-symbol">₪</div>}<div><strong>{expense.description ?? t("expense")}</strong><span>{unit?.name ?? t("unknownUnit")}{reporter ? ` · ${t("reportedBy")} ${reporter.name}` : ""}</span></div><b>{money(expense.amount)}</b><button aria-label={t("deleteExpense")} onClick={() => setExpenses((current) => current.filter((item) => item.id !== expense.id))}><Trash2 size={17} /></button></article>;
+                const expanded = expandedExpenseId === expense.id;
+                return <article className={`expense-log-card ${expanded ? "expanded" : ""}`} key={expense.id}><button className="expense-log-summary" aria-expanded={expanded} onClick={() => setExpandedExpenseId(expanded ? undefined : expense.id)}>{expense.receiptUrl ? <img className="expense-receipt-thumb" src={expense.receiptUrl} alt={t("receipt")} /> : <div className="expense-symbol">₪</div>}<div><strong>{expense.description ?? t("expense")}</strong><span>{unit?.name ?? t("unknownUnit")}{reporter ? ` · ${t("reportedBy")} ${reporter.name}` : ""}</span></div><b>{money(expense.amount)}</b><ChevronDown className="expense-chevron" size={19} /></button>{expanded && <div className="expense-log-details"><dl><div><dt>{t("amount")}</dt><dd>{money(expense.amount)}</dd></div><div><dt>{t("paidBy")}</dt><dd>{unit?.name ?? t("unknownUnit")}</dd></div>{reporter && <div><dt>{t("reportedBy")}</dt><dd>{reporter.name}</dd></div>}</dl>{expense.receiptUrl ? <a className="receipt-preview" href={expense.receiptUrl} target="_blank" rel="noreferrer"><img src={expense.receiptUrl} alt={t("receipt")} /><span>{t("viewReceipt")}</span></a> : <div className="no-receipt"><ReceiptText size={20} /> {t("noReceiptAttached")}</div>}<button className="expense-delete" onClick={() => { setExpenses((current) => current.filter((item) => item.id !== expense.id)); setExpandedExpenseId(undefined); }}><Trash2 size={17} /> {t("deleteExpense")}</button></div>}</article>;
               })}
             </div>
           </div>

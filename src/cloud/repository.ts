@@ -196,4 +196,4 @@ export function subscribeToCloudGroup(groupId: string, onChange: () => void) {
   return () => { void supabase.removeChannel(channel); };
 }
 
-export const invitationUrl = (token: string) => `${window.location.origin}${window.location.pathname}#join=${token}`;
+export const invitationUrl = (token: string, eventId?: string) => `${window.location.origin}${window.location.pathname}#join=${token}${eventId ? `&event=${encodeURIComponent(eventId)}` : ""}`;
