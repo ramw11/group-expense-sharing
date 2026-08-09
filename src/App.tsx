@@ -51,7 +51,10 @@ export default function App() {
     queueMicrotask(() => setCloudStatus("syncing"));
     void joinSharedGroup(incomingInvitation.token).then(async (groupId) => {
       const snapshot = await loadCloudGroup(groupId);
-      setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [...current.sharedGroups.filter((item) => item.groupId !== groupId), { groupId, role: current.sharedGroups.some((item) => item.groupId === groupId && item.role === "owner") ? "owner" : "participant" }] }));
+      setData((current) => {
+        const existing = current.sharedGroups.find((item) => item.groupId === groupId);
+        return { ...mergeSnapshot(current, snapshot), sharedGroups: [...current.sharedGroups.filter((item) => item.groupId !== groupId), { groupId, inviteToken: existing?.inviteToken, role: existing?.role === "owner" ? "owner" : "participant" }] };
+      });
       window.history.replaceState(null, "", window.location.pathname);
       const requestedEventId = incomingInvitation.eventId;
       setScreen(requestedEventId && snapshot.drafts.some((draft) => draft.id === requestedEventId) ? { name: "participant-expense", eventId: requestedEventId } : { name: "participant-home" });
@@ -132,7 +135,7 @@ export default function App() {
       const sourceData = pendingDraft ? { ...data, gatheringDrafts: [...data.gatheringDrafts.filter((item) => item.id !== pendingDraft.id), pendingDraft] } : data;
       if (pendingDraft) setData(sourceData);
       let connection = sourceData.sharedGroups.find((item) => item.groupId === groupId);
-      if (!connection) {
+      if (!connection?.inviteToken) {
         const recovered = await recoverOwnedGroup();
         if (recovered) {
           const snapshot = await loadCloudGroup(recovered.groupId);
@@ -143,7 +146,7 @@ export default function App() {
           }
           connection = { ...recovered, role: "owner" };
           setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [connection!] }));
-        } else {
+        } else if (!connection) {
           const inviteToken = await createSharedGroup(sourceData, groupId);
           connection = { groupId, inviteToken, role: "owner" };
           setData((current) => ({ ...current, sharedGroups: [connection!] }));
