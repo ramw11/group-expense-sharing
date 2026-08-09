@@ -52,6 +52,8 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   const [eventShareFailed, setEventShareFailed] = useState(false);
   const [manualFamilyName, setManualFamilyName] = useState("");
   const [manualMemberNames, setManualMemberNames] = useState("");
+  const [familyPickerOpen, setFamilyPickerOpen] = useState(false);
+  const [expandedFamilyIds, setExpandedFamilyIds] = useState<string[]>([]);
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const presentCount = presentIds.size;
 
@@ -85,6 +87,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
     setExpenses((current) => current.filter((expense) => expense.billingUnitId !== familyId));
     if (expenseUnitId === familyId) setExpenseUnitId(remaining[0] ?? "");
   };
+  const toggleFamilyDetails = (familyId: string) => setExpandedFamilyIds((current) => current.includes(familyId) ? current.filter((id) => id !== familyId) : [...current, familyId]);
 
   const toggle = (memberId: string) => setAttendance((current) => current.map((item) => item.memberId === memberId ? { ...item, present: !item.present } : item));
   const addExpense = () => {
@@ -156,10 +159,10 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 
-        <section className="event-family-picker">
-          <header><div><p className="eyebrow">{t("chooseParticipants")}</p><h2>{t("familiesInEvent")}</h2><p>{t("familyPickerCopy")}</p></div><span className="selected-family-count">{familyIds.length}</span></header>
-          <div className="family-picker-grid">{repositoryFamilies.map((family) => { const selected = familyIds.includes(family.id); return <button className={selected ? "selected" : ""} key={family.id} onClick={() => selected ? removeEventFamily(family.id) : addRepositoryFamily(family.id)}><span className="attendance-check">{selected && <Check size={15} />}</span><strong>{family.name}</strong><small>{repositoryMembers.filter((member) => member.billingUnitId === family.id).length} {t("members")}</small></button>; })}</div>
-          <div className="manual-family-row"><div><FolderPlus size={22} /><strong>{t("manualAddition")}</strong><small>{t("manualAdditionCopy")}</small></div><input value={manualFamilyName} onChange={(event) => setManualFamilyName(event.target.value)} placeholder={t("manualFamilyName")} /><input value={manualMemberNames} onChange={(event) => setManualMemberNames(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addManualFamily()} placeholder={t("manualMemberNames")} /><button onClick={addManualFamily}><Plus size={18} /> {t("addToEvent")}</button></div>
+        <section className={`event-family-picker ${familyPickerOpen ? "expanded" : "collapsed"}`}>
+          <button className="family-picker-toggle" aria-expanded={familyPickerOpen} onClick={() => setFamilyPickerOpen((open) => !open)}><div><p className="eyebrow">{t("chooseParticipants")}</p><h2>{t("familiesInEvent")}</h2><p>{t("familyPickerCopy")}</p></div><span className="selected-family-count">{familyIds.length}</span><ChevronDown className="accordion-chevron" size={22} /></button>
+          {familyPickerOpen && <div className="family-picker-content"><div className="family-picker-grid">{repositoryFamilies.map((family) => { const selected = familyIds.includes(family.id); return <button className={selected ? "selected" : ""} key={family.id} onClick={() => selected ? removeEventFamily(family.id) : addRepositoryFamily(family.id)}><span className="attendance-check">{selected && <Check size={15} />}</span><strong>{family.name}</strong><small>{repositoryMembers.filter((member) => member.billingUnitId === family.id).length} {t("members")}</small></button>; })}</div>
+          <div className="manual-family-row"><div><FolderPlus size={22} /><strong>{t("manualAddition")}</strong><small>{t("manualAdditionCopy")}</small></div><input value={manualFamilyName} onChange={(event) => setManualFamilyName(event.target.value)} placeholder={t("manualFamilyName")} /><input value={manualMemberNames} onChange={(event) => setManualMemberNames(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addManualFamily()} placeholder={t("manualMemberNames")} /><button onClick={addManualFamily}><Plus size={18} /> {t("addToEvent")}</button></div></div>}
         </section>
 
         <div className="gathering-layout">
@@ -168,12 +171,13 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
               const unitMembers = activeMembers.filter((member) => member.billingUnitId === unit.id);
               if (!unitMembers.length) return null;
               const unitPresent = unitMembers.filter((member) => presentIds.has(member.id)).length;
-              return <article className="attendance-unit" key={unit.id}>
-                <header><div><UsersRound size={19} /><strong>{unit.name}</strong></div><span>{unitPresent}/{unitMembers.length}</span></header>
-                <div className="attendance-members">{unitMembers.map((member) => {
+              const expanded = expandedFamilyIds.includes(unit.id);
+              return <article className={`attendance-unit ${expanded ? "expanded" : "collapsed"}`} key={unit.id}>
+                <button className="attendance-unit-toggle" aria-expanded={expanded} onClick={() => toggleFamilyDetails(unit.id)}><div><UsersRound size={19} /><strong>{unit.name}</strong></div><span>{unitPresent}/{unitMembers.length}</span><ChevronDown className="accordion-chevron" size={20} /></button>
+                {expanded && <div className="attendance-members">{unitMembers.map((member) => {
                   const present = presentIds.has(member.id);
                   return <button key={member.id} className={present ? "present" : ""} onClick={() => toggle(member.id)}><span className="attendance-check">{present && <Check size={15} />}</span><span>{member.name}</span></button>;
-                })}</div>
+                })}</div>}
               </article>;
             })}
           </section>
