@@ -8,12 +8,22 @@ export interface CloudGroupSnapshot {
   drafts: GatheringDraft[];
 }
 
+export interface OwnerConnection {
+  groupId: string;
+  inviteToken: string;
+}
+
 const randomToken = () => {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
 const throwIfError = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
+
+export const selectPrimaryOwnedGroup = (groupIds: string[], familyGroupIds: string[], eventGroupIds: string[]) => {
+  const score = (groupId: string) => familyGroupIds.filter((id) => id === groupId).length * 10 + eventGroupIds.filter((id) => id === groupId).length;
+  return [...groupIds].sort((a, b) => score(b) - score(a))[0];
+};
 
 async function uploadReceipt(groupId: string, eventId: string, expenseId: string, receiptUrl?: string, upsert = true) {
   if (!receiptUrl?.startsWith("data:")) return receiptUrl;
@@ -32,21 +42,44 @@ async function receiptUrl(path?: string | null) {
 }
 
 export async function createSharedGroup(data: PersistentData, groupId: string) {
-  await ensureAnonymousSession();
+  const user = await ensureAnonymousSession();
   const group = data.groups.find((item) => item.id === groupId);
   if (!group) throw new Error("Group not found");
   const inviteToken = randomToken();
   const { error: createError } = await supabase.rpc("create_shared_group", { group_id: group.id, group_name: group.name, invite_token: inviteToken });
-  throwIfError(createError);
+  if (createError) {
+    const ownerResult = await supabase.from("group_memberships").select("group_id").eq("group_id", groupId).eq("user_id", user.id).eq("role", "owner").maybeSingle();
+    throwIfError(ownerResult.error);
+    if (!ownerResult.data) throwIfError(createError);
+    throwIfError((await supabase.rpc("rotate_group_invite", { target_group_id: groupId, invite_token: inviteToken })).error);
+  }
 
   const units = data.billingUnits.filter((unit) => unit.groupId === groupId);
-  if (units.length) throwIfError((await supabase.from("billing_units").insert(units.map((unit) => ({ id: unit.id, group_id: groupId, name: unit.name, sort_order: unit.order })))).error);
+  if (units.length) throwIfError((await supabase.from("billing_units").upsert(units.map((unit) => ({ id: unit.id, group_id: groupId, name: unit.name, sort_order: unit.order })))).error);
   const unitIds = new Set(units.map((unit) => unit.id));
   const members = data.members.filter((member) => unitIds.has(member.billingUnitId));
-  if (members.length) throwIfError((await supabase.from("members").insert(members.map((member) => ({ id: member.id, group_id: groupId, billing_unit_id: member.billingUnitId, name: member.name, birth_date: member.birthDate, manual_weight: member.manualWeight, active: member.active, notes: member.notes, sort_order: member.order })))).error);
+  if (members.length) throwIfError((await supabase.from("members").upsert(members.map((member) => ({ id: member.id, group_id: groupId, billing_unit_id: member.billingUnitId, name: member.name, birth_date: member.birthDate, manual_weight: member.manualWeight, active: member.active, notes: member.notes, sort_order: member.order })))).error);
   const drafts = data.gatheringDrafts.filter((item) => item.groupId === groupId);
   for (const draft of drafts) await saveCloudDraft(groupId, draft, undefined);
   return inviteToken;
+}
+
+export async function recoverOwnedGroup(): Promise<OwnerConnection | undefined> {
+  const user = await ensureAnonymousSession();
+  const memberships = await supabase.from("group_memberships").select("group_id").eq("user_id", user.id).eq("role", "owner");
+  throwIfError(memberships.error);
+  const groupIds = (memberships.data ?? []).map((item) => item.group_id);
+  if (!groupIds.length) return undefined;
+  const [families, events] = await Promise.all([
+    supabase.from("billing_units").select("group_id").in("group_id", groupIds),
+    supabase.from("events").select("group_id").in("group_id", groupIds),
+  ]);
+  throwIfError(families.error); throwIfError(events.error);
+  const groupId = selectPrimaryOwnedGroup(groupIds, (families.data ?? []).map((item) => item.group_id), (events.data ?? []).map((item) => item.group_id));
+  if (!groupId) return undefined;
+  const inviteToken = randomToken();
+  throwIfError((await supabase.rpc("rotate_group_invite", { target_group_id: groupId, invite_token: inviteToken })).error);
+  return { groupId, inviteToken };
 }
 
 export async function joinSharedGroup(inviteToken: string) {

@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, Copy, FolderPlus, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, Cloud, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Attendance, BillingUnit, Expense, GatheringDraft, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
@@ -15,8 +15,12 @@ interface GatheringScreenProps {
   settings: Settings;
   language: Language;
   draft?: GatheringDraft;
+  shared: boolean;
+  cloudStatus: "idle" | "syncing" | "synced" | "error";
+  cloudMessage: string;
   onLanguageChange(language: Language): void;
   onSave(draft: GatheringDraft): void;
+  onShare(draft: GatheringDraft): void;
   onCreateFamily(family: BillingUnit, members: Member[]): void;
   onBack(): void;
   onEditGroup(): void;
@@ -24,7 +28,7 @@ interface GatheringScreenProps {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, settings, language, draft, onLanguageChange, onSave, onCreateFamily, onBack, onEditGroup }: GatheringScreenProps) {
+export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, settings, language, draft, shared, cloudStatus, cloudMessage, onLanguageChange, onSave, onShare, onCreateFamily, onBack, onEditGroup }: GatheringScreenProps) {
   const [familyIds, setFamilyIds] = useState<string[]>(() => draft?.familyIds ?? []);
   const units = useMemo(() => repositoryFamilies.filter((family) => familyIds.includes(family.id)), [familyIds, repositoryFamilies]);
   const members = useMemo(() => repositoryMembers.filter((member) => familyIds.includes(member.billingUnitId)), [familyIds, repositoryMembers]);
@@ -125,10 +129,12 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   return (
     <div className="gathering-shell">
       <header className="gathering-topbar">
-        <div className="gathering-nav"><button className="back-button light" onClick={saveAndBack}><ArrowLeft size={19} /> {t("backToEvents")}</button><button className="edit-group-button" onClick={saveAndEdit}><Pencil size={17} /> {t("editGroup")}</button></div>
+        <div className="gathering-nav"><button className="back-button light" onClick={saveAndBack}><ArrowLeft size={19} /> {t("backToEvents")}</button><button className="edit-group-button" onClick={saveAndEdit}><Pencil size={17} /> {t("editGroup")}</button><button className={`event-share-button ${shared ? "shared" : ""}`} disabled={cloudStatus === "syncing"} onClick={() => onShare(currentDraft())}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={17} /> : shared ? <Cloud size={17} /> : <Link2 size={17} />}{t("participantLink")}</button></div>
         <div className="gathering-brand"><span>Split</span><i /></div>
         <div className="gathering-controls"><button className={`draft-save-button ${saved ? "saved" : ""}`} onClick={save}>{saved ? <Check size={17} /> : <Save size={17} />}{saved ? t("draftSaved") : t("saveDraft")}</button><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
       </header>
+
+      {(cloudStatus === "error" || cloudMessage) && <div className={`event-cloud-banner ${cloudStatus}`}>{cloudStatus === "error" ? <CloudAlert size={17} /> : <Cloud size={17} />}<span>{cloudMessage}</span></div>}
 
       <main className="gathering-main">
         <section className="gathering-intro">

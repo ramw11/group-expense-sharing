@@ -5,7 +5,7 @@ import { GroupWorkspace } from "./components/groups/GroupWorkspace";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
 import { ParticipantExpense, ParticipantHome } from "./components/participant/ParticipantFlow";
 import type { CloudGroupSnapshot } from "./cloud/repository";
-import { clearCloudDraft, createSharedGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, saveCloudDraft, saveCloudMember, saveCloudUnit, submitCloudExpense, subscribeToCloudGroup } from "./cloud/repository";
+import { clearCloudDraft, createSharedGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, recoverOwnedGroup, saveCloudDraft, saveCloudMember, saveCloudUnit, submitCloudExpense, subscribeToCloudGroup } from "./cloud/repository";
 import type { BillingUnit, Expense, GatheringDraft, Member, PersistentData } from "./domain/models";
 import { createId } from "./utils/id";
 import { localAppStorage } from "./storage/localStorage";
@@ -16,13 +16,12 @@ type CloudStatus = "idle" | "syncing" | "synced" | "error";
 const today = () => new Date().toISOString().slice(0, 10);
 
 const mergeSnapshot = (current: PersistentData, snapshot: CloudGroupSnapshot): PersistentData => {
-  const previousUnitIds = new Set(current.billingUnits.filter((unit) => unit.groupId === snapshot.group.id).map((unit) => unit.id));
   return {
     ...current,
-    groups: [...current.groups.filter((group) => group.id !== snapshot.group.id), snapshot.group],
-    billingUnits: [...current.billingUnits.filter((unit) => unit.groupId !== snapshot.group.id), ...snapshot.units],
-    members: [...current.members.filter((member) => !previousUnitIds.has(member.billingUnitId)), ...snapshot.members],
-    gatheringDrafts: [...current.gatheringDrafts.filter((event) => event.groupId !== snapshot.group.id), ...snapshot.drafts],
+    groups: [snapshot.group],
+    billingUnits: snapshot.units,
+    members: snapshot.members,
+    gatheringDrafts: snapshot.drafts,
   };
 };
 
@@ -32,6 +31,7 @@ export default function App() {
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
   const [cloudMessage, setCloudMessage] = useState("");
   const handledInvite = useRef(false);
+  const attemptedOwnerRecovery = useRef(false);
   const language = data.settings.language;
   const primaryGroup = data.groups[0];
   const repositoryFamilies = primaryGroup ? data.billingUnits.filter((unit) => unit.groupId === primaryGroup.id) : [];
@@ -57,6 +57,19 @@ export default function App() {
       setCloudStatus("synced"); setCloudMessage(language === "he" ? "הצטרפתם למאגר ולאירועים המשותפים" : "Joined the shared repository and events");
     }).catch(() => { setCloudStatus("error"); setCloudMessage(language === "he" ? "קישור ההצטרפות אינו תקין או שפג תוקפו" : "The invitation is invalid or expired"); });
   }, [language, setData]);
+
+  useEffect(() => {
+    if (attemptedOwnerRecovery.current || sharedGroupIds || window.location.hash.startsWith("#join=")) return;
+    attemptedOwnerRecovery.current = true;
+    void recoverOwnedGroup().then(async (connection) => {
+      if (!connection) return;
+      setCloudStatus("syncing");
+      const snapshot = await loadCloudGroup(connection.groupId);
+      setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [{ ...connection, role: "owner" }] }));
+      setCloudStatus("synced");
+      setCloudMessage(language === "he" ? "השיתוף הקיים שוחזר" : "Existing sharing restored");
+    }).catch(() => setCloudStatus("idle"));
+  }, [language, setData, sharedGroupIds]);
 
   useEffect(() => {
     const groupIds = sharedGroupIds.split("|").filter(Boolean);
@@ -111,20 +124,37 @@ export default function App() {
     await submitCloudExpense(event.groupId, event.id, expense);
     setData((current) => ({ ...current, gatheringDrafts: current.gatheringDrafts.map((item) => item.id === eventId ? { ...item, expenses: [...item.expenses, expense], updatedAt: new Date().toISOString() } : item) }));
   };
-  const shareGroup = async (groupId: string) => {
+  const shareGroup = async (groupId: string, pendingDraft?: GatheringDraft) => {
     try {
       setCloudStatus("syncing");
-      let connection = data.sharedGroups.find((item) => item.groupId === groupId);
+      const sourceData = pendingDraft ? { ...data, gatheringDrafts: [...data.gatheringDrafts.filter((item) => item.id !== pendingDraft.id), pendingDraft] } : data;
+      if (pendingDraft) setData(sourceData);
+      let connection = sourceData.sharedGroups.find((item) => item.groupId === groupId);
       if (!connection) {
-        const inviteToken = await createSharedGroup(data, groupId);
-        connection = { groupId, inviteToken, role: "owner" };
-        setData((current) => ({ ...current, sharedGroups: [...current.sharedGroups, connection!] }));
+        const recovered = await recoverOwnedGroup();
+        if (recovered) {
+          const snapshot = await loadCloudGroup(recovered.groupId);
+          if (pendingDraft) {
+            const normalizedDraft = { ...pendingDraft, groupId: recovered.groupId };
+            await saveCloudDraft(recovered.groupId, normalizedDraft, snapshot.drafts.find((item) => item.id === normalizedDraft.id));
+            snapshot.drafts = [...snapshot.drafts.filter((item) => item.id !== normalizedDraft.id), normalizedDraft];
+          }
+          connection = { ...recovered, role: "owner" };
+          setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [connection!] }));
+        } else {
+          const inviteToken = await createSharedGroup(sourceData, groupId);
+          connection = { groupId, inviteToken, role: "owner" };
+          setData((current) => ({ ...current, sharedGroups: [connection!] }));
+        }
       }
       if (!connection.inviteToken) { setCloudMessage(language === "he" ? "המאגר משותף. רק הבעלים יכול להפיץ קישור." : "This repository is shared. Only the owner can share its link."); setCloudStatus("synced"); return; }
       const url = invitationUrl(connection.inviteToken);
       if (navigator.share) await navigator.share({ title: language === "he" ? "אירועים משותפים" : "Shared events", url }); else await navigator.clipboard.writeText(url);
       setCloudMessage(language === "he" ? "קישור הדיווח מוכן לשליחה" : "The reporting link is ready to send"); setCloudStatus("synced");
-    } catch { setCloudStatus("error"); setCloudMessage(language === "he" ? "לא הצלחנו להפעיל שיתוף כרגע" : "Could not enable sharing"); }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") { setCloudStatus("synced"); return; }
+      setCloudStatus("error"); setCloudMessage(language === "he" ? "לא הצלחנו להפעיל שיתוף כרגע" : "Could not enable sharing");
+    }
   };
   const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={data.sharedGroups.length > 0} canManage={canManage} language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => setScreen({ name: "admin-home" })} />;
 
@@ -134,7 +164,7 @@ export default function App() {
 
   if (screen.name === "gathering") {
     const draft = data.gatheringDrafts.find((event) => event.id === screen.eventId);
-    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} onLanguageChange={setLanguage} onSave={saveEvent} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
+    if (draft && primaryGroup) return <GatheringScreen key={`${draft.id}:${draft.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={draft} shared={shared(primaryGroup.id)} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={(currentDraft) => { void shareGroup(currentDraft.groupId, currentDraft); }} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
   }
 
   if (screen.name === "participant-expense") {
