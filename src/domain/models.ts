@@ -52,7 +52,7 @@ export interface Settings {
 }
 
 export interface PersistentData {
-  version: 4;
+  version: 5;
   groups: Group[];
   billingUnits: BillingUnit[];
   members: Member[];
