@@ -19,6 +19,24 @@ interface ParticipantHomeProps {
   onManage(): void;
 }
 
+interface ParticipantJoinStateProps {
+  language: Language;
+  status: "joining" | "error";
+  onLanguageChange(language: Language): void;
+}
+
+export function ParticipantJoinState({ language, status, onLanguageChange }: ParticipantJoinStateProps) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
+  const joining = status === "joining";
+  return <div className="participant-shell">
+    <header className="participant-topbar"><div className="participant-brand"><span>Split</span><i /></div><LanguageToggle language={language} onChange={onLanguageChange} dark /></header>
+    <main className="participant-main">
+      <section className="participant-hero"><p className="eyebrow">{t("participantHomeEyebrow")}</p><h1>{joining ? t("joiningEvent") : t("joinFailed")}</h1><p>{joining ? t("joiningEventCopy") : t("joinFailedCopy")}</p></section>
+      <section className="participant-empty compact"><div>{joining ? <LoaderCircle className="spin" size={30} /> : <X size={30} />}</div><h2>{joining ? t("connecting") : t("invalidLink")}</h2></section>
+    </main>
+  </div>;
+}
+
 export function ParticipantHome({ events, families, joined, canManage, language, statusMessage, onLanguageChange, onChooseEvent, onManage }: ParticipantHomeProps) {
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   return <div className="participant-shell">

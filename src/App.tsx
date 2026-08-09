@@ -3,9 +3,9 @@ import { GatheringScreen } from "./components/gathering/GatheringScreen";
 import { GroupHome } from "./components/groups/GroupHome";
 import { GroupWorkspace } from "./components/groups/GroupWorkspace";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
-import { ParticipantExpense, ParticipantHome } from "./components/participant/ParticipantFlow";
+import { ParticipantExpense, ParticipantHome, ParticipantJoinState } from "./components/participant/ParticipantFlow";
 import type { CloudGroupSnapshot } from "./cloud/repository";
-import { clearCloudDraft, createSharedGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, recoverOwnedGroup, saveCloudDraft, saveCloudMember, saveCloudUnit, submitCloudExpense, subscribeToCloudGroup } from "./cloud/repository";
+import { clearCloudDraft, createSharedGroup, deleteCloudMember, deleteCloudUnit, invitationUrl, joinSharedGroup, loadCloudGroup, parseInvitationUrl, recoverOwnedGroup, saveCloudDraft, saveCloudMember, saveCloudUnit, submitCloudExpense, subscribeToCloudGroup } from "./cloud/repository";
 import type { BillingUnit, Expense, GatheringDraft, Member, PersistentData } from "./domain/models";
 import { createId } from "./utils/id";
 import { localAppStorage } from "./storage/localStorage";
@@ -30,6 +30,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: "participant-home" });
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
   const [cloudMessage, setCloudMessage] = useState("");
+  const incomingInvitation = useMemo(() => parseInvitationUrl(window.location.href), []);
+  const [inviteStatus, setInviteStatus] = useState<"none" | "joining" | "error">(incomingInvitation ? "joining" : "none");
   const handledInvite = useRef(false);
   const attemptedOwnerRecovery = useRef(false);
   const language = data.settings.language;
@@ -44,23 +46,22 @@ export default function App() {
   useEffect(() => { document.documentElement.lang = language; document.documentElement.dir = language === "he" ? "rtl" : "ltr"; }, [language]);
 
   useEffect(() => {
-    if (handledInvite.current) return;
-    const match = window.location.hash.match(/^#join=([a-f0-9]{64})(?:&event=([^&]+))?$/);
-    if (!match) return;
+    if (handledInvite.current || !incomingInvitation) return;
     handledInvite.current = true;
     queueMicrotask(() => setCloudStatus("syncing"));
-    void joinSharedGroup(match[1]).then(async (groupId) => {
+    void joinSharedGroup(incomingInvitation.token).then(async (groupId) => {
       const snapshot = await loadCloudGroup(groupId);
       setData((current) => ({ ...mergeSnapshot(current, snapshot), sharedGroups: [...current.sharedGroups.filter((item) => item.groupId !== groupId), { groupId, role: current.sharedGroups.some((item) => item.groupId === groupId && item.role === "owner") ? "owner" : "participant" }] }));
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      const requestedEventId = match[2] ? decodeURIComponent(match[2]) : undefined;
+      window.history.replaceState(null, "", window.location.pathname);
+      const requestedEventId = incomingInvitation.eventId;
       setScreen(requestedEventId && snapshot.drafts.some((draft) => draft.id === requestedEventId) ? { name: "participant-expense", eventId: requestedEventId } : { name: "participant-home" });
+      setInviteStatus("none");
       setCloudStatus("synced"); setCloudMessage(language === "he" ? "הצטרפתם למאגר ולאירועים המשותפים" : "Joined the shared repository and events");
-    }).catch(() => { setCloudStatus("error"); setCloudMessage(language === "he" ? "קישור ההצטרפות אינו תקין או שפג תוקפו" : "The invitation is invalid or expired"); });
-  }, [language, setData]);
+    }).catch(() => { setInviteStatus("error"); setCloudStatus("error"); setCloudMessage(language === "he" ? "קישור ההצטרפות אינו תקין או שפג תוקפו" : "The invitation is invalid or expired"); });
+  }, [incomingInvitation, language, setData]);
 
   useEffect(() => {
-    if (attemptedOwnerRecovery.current || sharedGroupIds || window.location.hash.startsWith("#join=")) return;
+    if (attemptedOwnerRecovery.current || sharedGroupIds || incomingInvitation) return;
     attemptedOwnerRecovery.current = true;
     void recoverOwnedGroup().then(async (connection) => {
       if (!connection) return;
@@ -70,7 +71,7 @@ export default function App() {
       setCloudStatus("synced");
       setCloudMessage(language === "he" ? "השיתוף הקיים שוחזר" : "Existing sharing restored");
     }).catch(() => setCloudStatus("idle"));
-  }, [language, setData, sharedGroupIds]);
+  }, [incomingInvitation, language, setData, sharedGroupIds]);
 
   useEffect(() => {
     const groupIds = sharedGroupIds.split("|").filter(Boolean);
@@ -158,6 +159,8 @@ export default function App() {
     }
   };
   const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={data.sharedGroups.length > 0} canManage={canManage} language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => setScreen({ name: "admin-home" })} />;
+
+  if (inviteStatus !== "none") return <ParticipantJoinState language={language} status={inviteStatus} onLanguageChange={setLanguage} />;
 
   if (screen.name === "settings") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={(settings) => setData((current) => ({ ...current, settings }))} onBack={() => setScreen({ name: "admin-home" })} />;
 

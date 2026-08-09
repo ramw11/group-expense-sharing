@@ -13,6 +13,11 @@ export interface OwnerConnection {
   inviteToken: string;
 }
 
+export interface InvitationRequest {
+  token: string;
+  eventId?: string;
+}
+
 const randomToken = () => {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -196,4 +201,20 @@ export function subscribeToCloudGroup(groupId: string, onChange: () => void) {
   return () => { void supabase.removeChannel(channel); };
 }
 
-export const invitationUrl = (token: string, eventId?: string) => `${window.location.origin}${window.location.pathname}#join=${token}${eventId ? `&event=${encodeURIComponent(eventId)}` : ""}`;
+const validInviteToken = /^[a-f0-9]{64}$/;
+
+export function parseInvitationUrl(value: string): InvitationRequest | undefined {
+  const url = new URL(value, "https://localhost");
+  const legacy = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const token = url.searchParams.get("join") ?? legacy.get("join");
+  if (!token || !validInviteToken.test(token)) return undefined;
+  return { token, eventId: url.searchParams.get("event") ?? legacy.get("event") ?? undefined };
+}
+
+export const invitationUrl = (token: string, eventId?: string, currentUrl = window.location.href) => {
+  const current = new URL(currentUrl);
+  const url = new URL(current.pathname, current.origin);
+  url.searchParams.set("join", token);
+  if (eventId) url.searchParams.set("event", eventId);
+  return url.toString();
+};
