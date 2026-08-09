@@ -3,7 +3,6 @@ name: Test, build, and deploy
 on:
   push:
     branches: [deployment]
-  workflow_dispatch:
 
 permissions:
   contents: read
