@@ -1,4 +1,4 @@
-import type { Attendance, BillingUnit, Expense, Member, RoundingMode, Settings } from "../domain/models";
+import type { Attendance, BillingUnit, Expense, Member, RoundingMode, CalculationSettings } from "../domain/models";
 
 export interface MemberShare {
   memberId: string;
@@ -15,7 +15,7 @@ export interface BillingUnitSummary {
   balance: number;
 }
 
-export interface GatheringCalculation {
+export interface EventCalculation {
   totalPaid: number;
   totalWeight: number;
   costPerWeight: number;
@@ -37,10 +37,10 @@ export const ageOnDate = (birthDate: string, onDate: string): number => {
   return age;
 };
 
-export const memberWeight = (member: Member, gatheringDate: string, settings: Settings): number => {
+export const memberWeight = (member: Member, eventDate: string, settings: CalculationSettings): number => {
   if (settings.weightMode === "manual") return member.manualWeight ?? 1;
   if (!member.birthDate) return 1;
-  return ageOnDate(member.birthDate, gatheringDate) < settings.childAgeThreshold ? settings.childWeight : 1;
+  return ageOnDate(member.birthDate, eventDate) < settings.childAgeThreshold ? settings.childWeight : 1;
 };
 
 export const roundAmount = (amount: number, mode: RoundingMode): number => {
@@ -48,16 +48,16 @@ export const roundAmount = (amount: number, mode: RoundingMode): number => {
   return Math.round((amount + Number.EPSILON) / increment) * increment;
 };
 
-interface CalculateInput {
+interface CalculateEventInput {
   date: string;
   units: BillingUnit[];
   members: Member[];
   attendance: Attendance[];
   expenses: Expense[];
-  settings: Settings;
+  settings: CalculationSettings;
 }
 
-export const calculateGathering = ({ date, units, members, attendance, expenses, settings }: CalculateInput): GatheringCalculation => {
+export const calculateEvent = ({ date, units, members, attendance, expenses, settings }: CalculateEventInput): EventCalculation => {
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const attendees = members.filter((member) => member.active && presentIds.has(member.id));
   const totalPaid = expenses.reduce((sum, expense) => sum + expense.amount, 0);

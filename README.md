@@ -2,7 +2,7 @@
 
 A polished, Hebrew-first Progressive Web App for collecting and settling group expenses across families, couples, individuals, teams, or any other group.
 
-The app has two deliberately simple flows. One manager maintains reusable families, events, attendance, calculations, and the final report. Participants open one reporting link, choose an event, family, and their name, then submit an expense manually or from a receipt photo. No participant account or password is required. Supabase stores reports from all devices while LocalStorage keeps manager drafts and settings. The architecture is ready for future Capacitor-based Android packaging without coupling business rules to the UI or storage implementation.
+The app has two deliberately simple flows. One manager maintains reusable families, events, attendance, calculations, and the final report. Participants open an event-specific reporting link, choose their family and name, then submit an expense manually or from a receipt photo. No participant account or password is required. Supabase is the authoritative store for shared business data; LocalStorage contains device preferences only. The architecture remains suitable for future Capacitor-based Android packaging without coupling business rules to the UI or persistence layer.
 
 ## Features
 
@@ -14,7 +14,7 @@ The app has two deliberately simple flows. One manager maintains reusable famili
 - Automatic child weighting based on the gathering date
 - Manual participant weights
 - Touch-friendly attendance selection
-- Resumable event drafts saved on the device
+- Resumable events saved in Supabase
 - Custom names for individual events
 - Multiple expenses per billing unit
 - Camera-based receipt capture with on-device OCR amount detection
@@ -25,8 +25,8 @@ The app has two deliberately simple flows. One manager maintains reusable famili
 - Suggested payments between billing units
 - Copyable settlement report
 - Configurable currency, rounding, child threshold, child weight, and report footer
-- LocalStorage persistence for families, events, members, and settings
-- One reusable participant link with real-time expense delivery to the manager
+- Event-specific reporting links with real-time expense delivery to the manager
+- Calculation settings snapshotted per event so historical results do not change
 - Installable PWA with offline support
 - Hebrew-first interface with an English option and full RTL support
 - Responsive mobile and desktop interface
@@ -40,12 +40,12 @@ src/
 ├── business/    Pure calculation and settlement functions
 ├── components/  React UI grouped by feature
 ├── domain/      Data model and defaults
-├── hooks/       React state integration
-├── storage/     Replaceable persistence adapter
+├── cloud/       Supabase persistence and realtime refresh
+├── storage/     Device preferences and one-time legacy migration
 └── utils/       Framework-independent utilities
 ```
 
-Attendance and expenses are saved per event and can be resumed later. The `event_families` relation links reusable families and events without nesting either inside the other. Participants may read the shared event and insert expenses; only the group owner may change setup or existing data. Business functions do not import React, Supabase, or LocalStorage.
+Attendance and expenses are saved per event and can be resumed later. The `event_families` relation links reusable families and events without nesting either inside the other. Participants may open the linked event and insert expenses; only the group owner may change setup or existing data. Business functions do not import React, Supabase, or LocalStorage.
 
 ## Installation
 
@@ -54,7 +54,7 @@ Requirements: Node.js 22 or later and npm.
 ```bash
 git clone https://github.com/ramw11/group-expense-sharing.git
 cd group-expense-sharing
-npm install
+npm ci
 ```
 
 ## Development
@@ -81,7 +81,7 @@ The production output is written to `dist/`.
 
 ## Deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` tests, lints, builds, and deploys the application automatically whenever `main` is updated.
+The workflow in `.github/workflows/deploy-pages.yml` tests, lints, builds, and deploys the application automatically whenever the stable `deployment` branch is updated. Ongoing development is kept on `dev`.
 
 The connected Supabase project uses the migrations in `supabase/migrations`. Anonymous sign-ins must be enabled under Authentication settings for passwordless group invitations.
 
@@ -89,4 +89,8 @@ In the repository settings, select **GitHub Actions** as the GitHub Pages source
 
 ## Data and privacy
 
-Unshared manager drafts stay in the browser's LocalStorage. After the manager creates the participant link, group data, events, attendance, expenses, reporter identity, and compressed receipt photos are synchronized to the connected Supabase project. OCR processing itself stays in the participant's browser. Participants cannot change families, events, attendance, settlement settings, or existing expenses.
+Families, members, events, attendance, expenses, reporter identity, calculation snapshots, and receipt associations are stored in Supabase. Compressed receipt images are stored in the private Supabase Storage bucket and loaded with signed URLs. OCR processing itself stays in the participant's browser and only suggests an editable amount. LocalStorage is limited to language, active-manager context, and the last opened participant event; legacy business data is removed after its one-time migration. Participants cannot change families, events, attendance, settlement settings, or existing expenses.
+
+## Versioning
+
+The canonical application version is the `version` field in `package.json`; the build injects it into Settings/About. Releases follow Semantic Versioning. A `v1.0.0` tag is created only after all Critical and High release gates in the engineering plan pass.

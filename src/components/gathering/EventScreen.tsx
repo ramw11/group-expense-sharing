@@ -1,27 +1,27 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, ChevronDown, Cloud, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, ChevronDown, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Attendance, BillingUnit, Expense, GatheringDraft, Group, Language, Member, Settings } from "../../domain/models";
+import type { Attendance, BillingUnit, Expense, Event, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
-import { calculateGathering, createSettlements } from "../../business/calculations";
+import { calculateEvent, createSettlements } from "../../business/calculations";
 import { translate } from "../../i18n";
 import { prepareReceiptImage } from "../../utils/image";
 import { recognizeReceiptAmount } from "../../utils/receiptOcr";
 import { LanguageToggle } from "../ui/LanguageToggle";
 import { ShareLinkPanel } from "../ui/ShareLinkPanel";
+import { calculationSettingsFrom } from "../../domain/defaults";
 
-interface GatheringScreenProps {
+interface EventScreenProps {
   group: Group;
   repositoryFamilies: BillingUnit[];
   repositoryMembers: Member[];
   settings: Settings;
   language: Language;
-  draft?: GatheringDraft;
-  shared: boolean;
+  draft?: Event;
   cloudStatus: "idle" | "syncing" | "synced" | "error";
   cloudMessage: string;
   onLanguageChange(language: Language): void;
-  onSave(draft: GatheringDraft): void;
-  onShare(draft: GatheringDraft): Promise<string>;
+  onSave(draft: Event): void;
+  onShare(draft: Event): Promise<string>;
   onCreateFamily(family: BillingUnit, members: Member[]): void;
   onBack(): void;
   onEditGroup(): void;
@@ -29,7 +29,7 @@ interface GatheringScreenProps {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, settings, language, draft, shared, cloudStatus, cloudMessage, onLanguageChange, onSave, onShare, onCreateFamily, onBack, onEditGroup }: GatheringScreenProps) {
+export function EventScreen({ group, repositoryFamilies, repositoryMembers, settings, language, draft, cloudStatus, cloudMessage, onLanguageChange, onSave, onShare, onCreateFamily, onBack, onEditGroup }: EventScreenProps) {
   const [familyIds, setFamilyIds] = useState<string[]>(() => draft?.familyIds ?? []);
   const units = useMemo(() => repositoryFamilies.filter((family) => familyIds.includes(family.id)), [familyIds, repositoryFamilies]);
   const members = useMemo(() => repositoryMembers.filter((member) => familyIds.includes(member.billingUnitId)), [familyIds, repositoryMembers]);
@@ -54,6 +54,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
   const [manualMemberNames, setManualMemberNames] = useState("");
   const [familyPickerOpen, setFamilyPickerOpen] = useState(false);
   const [expandedFamilyIds, setExpandedFamilyIds] = useState<string[]>([]);
+  const calculationSettings = draft?.calculationSettings ?? calculationSettingsFrom(settings);
   const presentIds = new Set(attendance.filter((item) => item.present).map((item) => item.memberId));
   const presentCount = presentIds.size;
 
@@ -109,10 +110,10 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
     } catch { setScanState({ status: "failed", progress: 0 }); }
   };
   const totalPaid = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const calculation = calculateGathering({ date, units, members, attendance, expenses, settings });
+  const calculation = calculateEvent({ date, units, members, attendance, expenses, settings: calculationSettings });
   const settlements = createSettlements(calculation.unitSummaries);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
-  const currentDraft = (): GatheringDraft => ({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date, familyIds, attendance, expenses, updatedAt: new Date().toISOString() });
+  const currentDraft = (): Event => ({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date, familyIds, attendance, expenses, calculationSettings, updatedAt: new Date().toISOString() });
   const save = () => { onSave(currentDraft()); setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
   const saveAndBack = () => { onSave(currentDraft()); onBack(); };
   const saveAndEdit = () => { onSave(currentDraft()); onEditGroup(); };
@@ -140,7 +141,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
     const nextAttendance = activeMembers.map((member) => ({ memberId: member.id, present: true }));
     const nextDate = today();
     setDate(nextDate); setAttendance(nextAttendance); setExpenses([]); setExpenseAmount(""); setExpenseDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
-    onSave({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date: nextDate, familyIds, attendance: nextAttendance, expenses: [], updatedAt: new Date().toISOString() });
+    onSave({ id: draft?.id ?? createId(), groupId: group.id, name: eventName.trim() || t("unnamedEvent"), date: nextDate, familyIds, attendance: nextAttendance, expenses: [], calculationSettings, updatedAt: new Date().toISOString() });
   };
 
   return (
@@ -151,11 +152,11 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
         <div className="gathering-controls"><button className={`draft-save-button ${saved ? "saved" : ""}`} onClick={save}>{saved ? <Check size={17} /> : <Save size={17} />}{saved ? t("draftSaved") : t("saveDraft")}</button><LanguageToggle language={language} onChange={onLanguageChange} dark /><label className="gathering-date"><span>{t("gatheringDate")}</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
       </header>
 
-      {(cloudStatus === "error" || cloudMessage) && <div className={`event-cloud-banner ${cloudStatus}`}>{cloudStatus === "error" ? <CloudAlert size={17} /> : <Cloud size={17} />}<span>{cloudMessage}</span></div>}
+      {cloudStatus === "error" && <div className={`event-cloud-banner ${cloudStatus}`}><CloudAlert size={17} /><span>{cloudMessage}</span></div>}
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className={`event-inline-share ${shared ? "shared" : ""}`} disabled={eventShareLoading || cloudStatus === "syncing"} onClick={() => { void createEventLink(); }}>{eventShareLoading ? <LoaderCircle className="spin" size={20} /> : shared ? <Cloud size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button>{eventShareFailed && <p className="share-link-error">{t("linkCreationFailed")}</p>}{eventShareUrl && <ShareLinkPanel url={eventShareUrl} title={eventName.trim() || t("unnamedEvent")} language={language} onClose={() => setEventShareUrl("")} />}</div>
+          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className="event-inline-share" disabled={eventShareLoading || cloudStatus === "syncing"} onClick={() => { void createEventLink(); }}>{eventShareLoading ? <LoaderCircle className="spin" size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button>{eventShareFailed && <p className="share-link-error">{t("linkCreationFailed")}</p>}{eventShareUrl && <ShareLinkPanel url={eventShareUrl} title={eventName.trim() || t("unnamedEvent")} language={language} onClose={() => setEventShareUrl("")} />}</div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 
@@ -222,7 +223,7 @@ export function GatheringScreen({ group, repositoryFamilies, repositoryMembers, 
           <header><div><p className="eyebrow">{t("finishLine")}</p><h2>{t("settledSimply")}</h2></div><div className="settlement-actions"><button className="copy-button" onClick={copyReport}>{copied ? <CheckCircle2 size={19} /> : <Copy size={19} />}{copied ? t("copied") : t("copyReport")}</button><button className="reset-button" onClick={reset}><RotateCcw size={18} /> {t("reset")}</button></div></header>
           {calculation.totalWeight === 0 ? <div className="calculation-empty">{t("chooseAttendee")}</div> : calculation.totalPaid === 0 ? <div className="calculation-empty">{t("addExpensePrompt")}</div> : <>
             <div className="summary-metrics"><article><span>{t("totalSpent")}</span><strong>{money(calculation.totalPaid)}</strong></article><article><span>{t("totalWeight")}</span><strong>{calculation.totalWeight.toLocaleString()}</strong></article><article><span>{t("perShare")}</span><strong>{money(calculation.costPerWeight)}</strong></article></div>
-            <div className="settlement-grid"><div className="balance-table"><div className="balance-head"><span>{t("billingUnit")}</span><span>{t("paid")}</span><span>{t("share")}</span><span>{t("balance")}</span></div>{calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => <div className="balance-row" key={item.billingUnitId}><strong>{unitName(item.billingUnitId)}</strong><span>{money(item.paid)}</span><span>{money(item.share)}</span><b className={item.balance >= 0 ? "positive" : "negative"}>{item.balance >= 0 ? "+" : ""}{money(item.balance)}</b></div>)}</div>
+            <div className="settlement-grid"><div className="balance-table"><div className="balance-head"><span>{t("billingUnit")}</span><span>{t("paid")}</span><span>{t("share")}</span><span>{t("balance")}</span></div>{calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => <div className="balance-row" key={item.billingUnitId}><strong>{unitName(item.billingUnitId)}</strong><span data-label={t("paid")}>{money(item.paid)}</span><span data-label={t("share")}>{money(item.share)}</span><b data-label={t("balance")} className={item.balance >= 0 ? "positive" : "negative"}>{item.balance >= 0 ? "+" : ""}{money(item.balance)}</b></div>)}</div>
               <aside className="payments-card"><p className="section-kicker">{t("whoPaysWhom")}</p>{settlements.length === 0 ? <div className="all-set"><Check size={25} /><strong>{t("allSettled")}</strong></div> : settlements.map((item, index) => <div className="payment-line" key={`${item.fromBillingUnitId}-${item.toBillingUnitId}`}><span>{index + 1}</span><p><strong>{unitName(item.fromBillingUnitId)}</strong> {t("pays")} <strong>{unitName(item.toBillingUnitId)}</strong></p><b>{money(item.amount)}</b></div>)}</aside>
             </div>
           </>}

@@ -11,11 +11,17 @@ export const defaultSettings: Settings = {
 };
 
 export const emptyPersistentData = (): PersistentData => ({
-  version: 5,
-  groups: [{ id: "group-local", name: "הקבוצה שלי" }],
+  version: 6,
+  groups: [],
   billingUnits: [],
   members: [],
-  gatheringDrafts: [],
-  sharedGroups: [],
+  events: [],
   settings: { ...defaultSettings },
+});
+
+export const calculationSettingsFrom = (settings: Settings) => ({
+  childAgeThreshold: settings.childAgeThreshold,
+  childWeight: settings.childWeight,
+  weightMode: settings.weightMode,
+  roundingMode: settings.roundingMode,
 });

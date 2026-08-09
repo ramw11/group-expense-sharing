@@ -1,16 +1,13 @@
-import { ArrowUpRight, CalendarDays, Cloud, CloudAlert, FolderHeart, Link2, LoaderCircle, Pencil, Plus, ReceiptText, Settings, Trash2 } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Cloud, CloudAlert, FolderHeart, LoaderCircle, Pencil, Plus, ReceiptText, Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { BillingUnit, GatheringDraft, Language } from "../../domain/models";
+import type { BillingUnit, Event, Language } from "../../domain/models";
 import { translate } from "../../i18n";
 import { IconButton } from "../ui/IconButton";
 import { LanguageToggle } from "../ui/LanguageToggle";
-import { ShareLinkPanel } from "../ui/ShareLinkPanel";
 
 interface GroupHomeProps {
-  events: GatheringDraft[];
+  events: Event[];
   families: BillingUnit[];
-  groupId: string;
-  shared: boolean;
   cloudStatus: "idle" | "syncing" | "synced" | "error";
   cloudMessage: string;
   language: Language;
@@ -19,18 +16,14 @@ interface GroupHomeProps {
   onUpdate(id: string, name: string): void;
   onDelete(id: string): void;
   onStart(id: string): void;
-  onShare(groupId: string): Promise<string>;
   onFamilies(): void;
   onSettings(): void;
   onParticipantHome(): void;
 }
 
-export function GroupHome({ events, families, groupId, shared, cloudStatus, cloudMessage, language, onLanguageChange, onCreate, onUpdate, onDelete, onStart, onShare, onFamilies, onSettings, onParticipantHome }: GroupHomeProps) {
+export function GroupHome({ events, families, cloudStatus, cloudMessage, language, onLanguageChange, onCreate, onUpdate, onDelete, onStart, onFamilies, onSettings, onParticipantHome }: GroupHomeProps) {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState("");
-  const [shareLoading, setShareLoading] = useState(false);
-  const [shareFailed, setShareFailed] = useState(false);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const submit = () => {
     const next = name.trim();
@@ -38,18 +31,8 @@ export function GroupHome({ events, families, groupId, shared, cloudStatus, clou
     if (editingId) onUpdate(editingId, next); else onCreate(next);
     setName(""); setEditingId(null);
   };
-  const createShareLink = async () => {
-    setShareLoading(true);
-    setShareFailed(false);
-    try { setShareUrl(await onShare(groupId)); }
-    catch { setShareFailed(true); }
-    finally { setShareLoading(false); }
-  };
-
   return <div className="page-shell">
-    <div className="home-tools"><LanguageToggle language={language} onChange={onLanguageChange} /><button className="participant-trigger" onClick={onParticipantHome}><ReceiptText size={18} /> {t("reportExpense")}</button><button className={`participant-link-trigger ${shared ? "shared" : ""}`} disabled={shareLoading || cloudStatus === "syncing"} onClick={() => { void createShareLink(); }}>{shareLoading ? <LoaderCircle className="spin" size={17} /> : shared ? <Cloud size={17} /> : <Link2 size={17} />} {t("participantLink")}</button><button className="family-trigger" onClick={onFamilies}><FolderHeart size={18} /> {t("familyRepository")} <b>{families.length}</b></button><button className="settings-trigger" onClick={onSettings}><Settings size={18} /> {t("settings")}</button></div>
-    {shareFailed && <p className="share-link-error home-share-error">{t("linkCreationFailed")}</p>}
-    {shareUrl && <ShareLinkPanel url={shareUrl} title={language === "he" ? "אירועים משותפים" : "Shared events"} language={language} onClose={() => setShareUrl("")} />}
+    <div className="home-tools"><LanguageToggle language={language} onChange={onLanguageChange} /><button className="participant-trigger" onClick={onParticipantHome}><ReceiptText size={18} /> {t("reportExpense")}</button><button className="family-trigger" onClick={onFamilies}><FolderHeart size={18} /> {t("familyRepository")} <b>{families.length}</b></button><button className="settings-trigger" onClick={onSettings}><Settings size={18} /> {t("settings")}</button></div>
     <header className="hero-grid"><div><p className="eyebrow">{t("managerHome")}</p><h1>{t("homeTitleA")}<br /><span>{t("homeTitleB")}</span></h1><p className="hero-copy">{t("homeCopyIndependent")}</p></div><div className="hero-orbit" aria-hidden="true"><div className="orbit-card orbit-one">₪</div><div className="orbit-card orbit-two"><CalendarDays size={31} /></div><div className="orbit-dot" /></div></header>
     {(cloudStatus !== "idle" || cloudMessage) && <div className={`cloud-banner ${cloudStatus}`}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={18} /> : cloudStatus === "error" ? <CloudAlert size={18} /> : <Cloud size={18} />}<strong>{cloudStatus === "syncing" ? t("syncing") : cloudStatus === "error" ? t("syncError") : t("synced")}</strong>{cloudMessage && <span>{cloudMessage}</span>}</div>}
 

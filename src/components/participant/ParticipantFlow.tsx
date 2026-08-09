@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowUpRight, Camera, Check, CalendarDays, LoaderCircle, LockKeyhole, Plus, ReceiptText, UserRound, UsersRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { BillingUnit, Expense, GatheringDraft, Language, Member, Settings } from "../../domain/models";
+import type { BillingUnit, Expense, Event, Language, Member, Settings } from "../../domain/models";
 import { translate } from "../../i18n";
 import { createId } from "../../utils/id";
 import { prepareReceiptImage } from "../../utils/image";
@@ -8,7 +8,7 @@ import { recognizeReceiptAmount } from "../../utils/receiptOcr";
 import { LanguageToggle } from "../ui/LanguageToggle";
 
 interface ParticipantHomeProps {
-  events: GatheringDraft[];
+  events: Event[];
   families: BillingUnit[];
   joined: boolean;
   canManage: boolean;
@@ -50,7 +50,7 @@ export function ParticipantHome({ events, families, joined, canManage, language,
 }
 
 interface ParticipantExpenseProps {
-  event: GatheringDraft;
+  event: Event;
   families: BillingUnit[];
   members: Member[];
   settings: Settings;
@@ -72,6 +72,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
   const [receiptUrl, setReceiptUrl] = useState<string>();
   const [scanState, setScanState] = useState<ScanState>({ status: "idle", progress: 0 });
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "saved" | "error">("idle");
+  const [savedExpense, setSavedExpense] = useState<{ amount: number; family: string; reporter: string }>();
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const selectedFamily = availableFamilies.find((family) => family.id === familyId);
   const selectedMember = availableMembers.find((member) => member.id === memberId);
@@ -96,6 +97,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
     setSubmitState("submitting");
     try {
       await onSubmit({ id: createId(), billingUnitId: familyId, reportedByMemberId: memberId, amount: numericAmount, description: description.trim() || undefined, receiptUrl });
+      setSavedExpense({ amount: numericAmount, family: selectedFamily!.name, reporter: selectedMember!.name });
       setSubmitState("saved"); setAmount(""); setDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
     } catch { setSubmitState("error"); }
   };
@@ -110,7 +112,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
       {familyId && <section className="identity-card member-choice"><header><div><p className="eyebrow">02</p><h2>{t("chooseYourName")}</h2></div><UserRound size={27} /></header><div className="identity-options">{availableMembers.map((member) => <button className={member.id === memberId ? "selected" : ""} key={member.id} onClick={() => { setMemberId(member.id); setSubmitState("idle"); }}><span>{member.id === memberId && <Check size={15} />}</span>{member.name}</button>)}</div></section>}
 
       {selectedMember && <section className="participant-expense-card"><header><div><p className="eyebrow">03</p><h2>{t("reportExpense")}</h2><p>{selectedMember.name} · {selectedFamily?.name}</p></div><ReceiptText size={30} /></header>
-        {submitState === "saved" ? <div className="participant-success"><div><Check size={28} /></div><h3>{t("expenseSaved")}</h3><p>{t("expenseSavedCopy")}</p><button onClick={() => setSubmitState("idle")}><Plus size={18} /> {t("reportAnother")}</button></div> : <div className="participant-expense-form">
+        {submitState === "saved" ? <div className="participant-success"><div><Check size={28} /></div><h3>{t("expenseSaved")}</h3><p>{t("expenseSavedCopy")}</p>{savedExpense && <dl className="participant-confirmation"><div><dt>{t("amount")}</dt><dd>{money(savedExpense.amount)}</dd></div><div><dt>{t("billingUnit")}</dt><dd>{savedExpense.family}</dd></div><div><dt>{t("reportedBy")}</dt><dd>{savedExpense.reporter}</dd></div></dl>}<button onClick={() => setSubmitState("idle")}><Plus size={18} /> {t("reportAnother")}</button></div> : <div className="participant-expense-form">
           <label><span>{t("amount")}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => { setAmount(e.target.value); setSubmitState("idle"); }} placeholder="0.00" /></label>
           <label><span>{t("description")} <i>{t("optional")}</i></span><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("descPlaceholder")} /></label>
           <div className="participant-receipt"><input className="sr-only" id="participant-receipt" type="file" accept="image/*" capture="environment" onChange={(e) => { void scanReceipt(e.target.files?.[0]); e.target.value = ""; }} />{receiptUrl ? <img src={receiptUrl} alt={t("receipt")} /> : <div><Camera size={25} /></div>}<label htmlFor="participant-receipt"><Camera size={18} /> {receiptUrl ? t("changeReceipt") : t("takeReceipt")}</label><small>{scanState.status === "scanning" ? `${t("scanningReceipt")} ${scanState.progress}%` : scanState.status === "found" ? t("receiptAmountFound") : scanState.status === "missing" ? t("receiptAmountMissing") : scanState.status === "failed" ? t("receiptScanFailed") : t("receiptOptional")}</small>{receiptUrl && <button aria-label={t("removeReceipt")} onClick={() => { setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); }}><X size={16} /></button>}</div>

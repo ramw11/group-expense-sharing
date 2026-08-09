@@ -30,6 +30,7 @@ export interface Expense {
   description?: string;
   amount: number;
   receiptUrl?: string;
+  receiptPath?: string;
 }
 
 export interface Attendance {
@@ -51,23 +52,24 @@ export interface Settings {
   reportFooter: string;
 }
 
+export type CalculationSettings = Pick<Settings, "childAgeThreshold" | "childWeight" | "weightMode" | "roundingMode">;
+
 export interface PersistentData {
-  version: 5;
+  version: 6;
   groups: Group[];
   billingUnits: BillingUnit[];
   members: Member[];
-  gatheringDrafts: GatheringDraft[];
-  sharedGroups: SharedGroupConnection[];
+  events: Event[];
   settings: Settings;
 }
 
-export interface SharedGroupConnection {
+export interface CloudConnection {
   groupId: Id;
-  inviteToken?: string;
   role: "owner" | "participant";
+  eventId?: Id;
 }
 
-export interface GatheringDraft {
+export interface Event {
   id: Id;
   groupId: Id;
   name: string;
@@ -75,5 +77,6 @@ export interface GatheringDraft {
   familyIds: Id[];
   attendance: Attendance[];
   expenses: Expense[];
+  calculationSettings: CalculationSettings;
   updatedAt: string;
 }
