@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a standalone PDF export of the dashboard with charts, insights, and the final payment summary, without calculation details.
 - Added PNG and multi-page PDF export for the full visual calculation audit report.
 - Added a manager dashboard with family expense share, paid-versus-share balances, reporter totals, and largest-expense insights.
 - Changed participant weighting to always prefer a configured manual weight (including zero), then age-based weight, then the default weight of one.
