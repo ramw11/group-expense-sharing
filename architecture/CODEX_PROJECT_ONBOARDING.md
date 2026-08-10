@@ -4,7 +4,7 @@
 
 Continue development of the Group Expense Sharing application without losing the product's deliberate simplicity or the v1.0 stabilization guarantees.
 
-The immediate mission is **release validation**, not feature expansion. The code is at pre-release version `0.9.0`. Stabilization implementation is complete, but physical-device acceptance and the real administrator migration check still block `v1.0.0`.
+The current released product line is `1.2.0`. Continue to preserve the stabilization guarantees, self-hosted deployment boundary, production data, shared manager-code access, and event-scoped participant permissions.
 
 ## 2. Start every work session safely
 

@@ -2,9 +2,9 @@
 
 **Project:** Group Expense Sharing  
 **Repository:** `ramw11/group-expense-sharing`  
-**Current application version:** `0.9.0`  
+**Current application version:** `1.2.0`
 **Last updated:** 2026-08-10  
-**Status:** v1.0 stabilization implemented; physical acceptance gates remain open
+**Status:** v1.2.0 release prepared with shared manager access and protected expense corrections
 
 ## 1. Purpose of this document
 
