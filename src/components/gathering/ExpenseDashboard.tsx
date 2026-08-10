@@ -40,11 +40,21 @@ export function ExpenseDashboard({ units, members, expenses, calculation, curren
   const exportPdf = async () => {
     if (!dashboardRef.current || !chartsRef.current || !insightsRef.current || !summaryRef.current) return;
     setExporting(true);
+    let exportRoot: HTMLElement | null = null;
     try {
       await document.fonts.ready;
-      const { default: html2canvas } = await import("html2canvas");
-      const captureOptions = { backgroundColor: "#182a20", scale: Math.min(window.devicePixelRatio || 1, 1.5), logging: false, windowWidth: 1280, onclone: (clone: Document) => { clone.querySelectorAll<HTMLElement>("[data-export-hide]").forEach((element) => { element.style.display = "none"; }); const dashboard = clone.querySelector<HTMLElement>(".expense-dashboard"); if (dashboard) { dashboard.classList.add("pdf-export-mode"); dashboard.style.width = "1120px"; dashboard.style.maxWidth = "none"; } } };
-      const canvases = await Promise.all([html2canvas(chartsRef.current, captureOptions), html2canvas(insightsRef.current, captureOptions), html2canvas(summaryRef.current, captureOptions)]);
+      const { toCanvas } = await import("html-to-image");
+      exportRoot = dashboardRef.current.cloneNode(true) as HTMLElement;
+      exportRoot.classList.add("pdf-export-mode");
+      Object.assign(exportRoot.style, { position: "fixed", inset: "0 auto auto -100000px", width: "1120px", maxWidth: "none", margin: "0" });
+      exportRoot.querySelectorAll<HTMLElement>("[data-export-hide]").forEach((element) => { element.style.display = "none"; });
+      document.body.append(exportRoot);
+      await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
+      const pages = [...exportRoot.querySelectorAll<HTMLElement>(".dashboard-pdf-page")];
+      if (pages.length !== 3) throw new Error("Dashboard export pages are missing");
+      const captureOptions = { backgroundColor: "#182a20", pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5), cacheBust: true, width: 1120, style: { width: "1120px", maxWidth: "none", overflow: "visible" } };
+      const canvases = [];
+      for (const page of pages) canvases.push(await toCanvas(page, captureOptions));
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -60,7 +70,7 @@ export function ExpenseDashboard({ units, members, expenses, calculation, curren
         pdf.addImage(canvas.toDataURL("image/jpeg", .94), "JPEG", (pageWidth - imageWidth) / 2, margin, imageWidth, imageHeight, undefined, "FAST");
       });
       pdf.save(`${(eventName || "dashboard").replace(/[\\/:*?"<>|]/g, "-")}-dashboard.pdf`);
-    } finally { setExporting(false); }
+    } finally { exportRoot?.remove(); setExporting(false); }
   };
 
   return <section className="expense-dashboard" aria-label={he ? "לוח מחוונים" : "Dashboard"} ref={dashboardRef}>

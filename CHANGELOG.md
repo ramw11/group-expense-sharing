@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the dashboard PDF's canvas text renderer with browser-native DOM image capture to prevent Hebrew bold-text clipping throughout the report.
 - Corrected vertical alignment and clipping inside exported balance badges and bold family labels.
 - Fixed clipped Hebrew glyphs and overflowing headings in dashboard PDF exports.
 - Replaced the paid-versus-share bar chart with a separate two-segment pie chart for every family.
