@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Corrected vertical alignment and clipping inside exported balance badges and bold family labels.
 - Fixed clipped Hebrew glyphs and overflowing headings in dashboard PDF exports.
 - Replaced the paid-versus-share bar chart with a separate two-segment pie chart for every family.
 - Replaced the dashboard gradient donut with an export-safe SVG family pie chart and changed reporter analytics to a clear table.
