@@ -128,6 +128,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
 .share-link-panel > p, .share-link-error { margin: 0; color: #ffad9c; font-size: .72rem; font-weight: 800; }
 .home-share-error { position: relative; z-index: 2; margin-top: .7rem; color: #9d382d; }
 .expense-header-actions { display: flex; align-items: flex-end; gap: .8rem; }
+.expense-list-controls { margin-top: 1rem; display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto; align-items: end; gap: .7rem; padding: .75rem; border: 1px solid #ffffff1d; border-radius: 16px; background: #ffffff08; }
+.expense-list-controls label { display: grid; gap: .3rem; }
+.expense-list-controls label > span { color: #aeb8b0; font-size: .68rem; font-weight: 850; }
+.expense-list-controls select { width: 100%; padding: .65rem .75rem; border: 1px solid #ffffff25; border-radius: 11px; color: white; background: #10251a; font: inherit; font-weight: 750; }
+.expense-list-controls > strong { min-width: 3.5rem; padding: .65rem; border-radius: 11px; color: var(--lime); background: #0c1c12; text-align: center; }
 .expense-form-toggle { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--lime); border-radius: 14px; color: var(--ink); background: var(--lime); font-size: .76rem; font-weight: 900; }
 .family-paid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; margin-top: 1rem; }
 .family-paid-summary article { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .6rem; padding: .65rem .75rem; border: 1px solid #ffffff1f; border-radius: 15px; background: #ffffff08; }
@@ -160,6 +165,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
   .expense-section > header { align-items: stretch; flex-direction: column; gap: .7rem; }
   .expense-section h2 { font-size: 2.35rem; }
   .expense-header-actions { align-items: center; justify-content: space-between; }
+  .expense-list-controls { grid-template-columns: 1fr 1fr; }
+  .expense-list-controls > strong { grid-column: 1 / -1; }
   .expense-total { align-items: flex-start; }
   .family-paid-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .expense-grid { margin-top: .8rem; }

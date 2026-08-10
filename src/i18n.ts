@@ -1,6 +1,7 @@
 import type { Language } from "./domain/models";
 
 const en = {
+  filterByFamily: "Filter by family", allFamilies: "All families", sortReports: "Sort reports", originalOrder: "Original order", sortByFamily: "By family", sortByReporter: "By reporter", noMatchingExpenses: "No reports match this family.",
   expenseTitle: "Title", expenseNotes: "Note", editExpense: "Edit report", saveChanges: "Save changes", addReceiptLater: "Add receipt", changesSaved: "Changes saved", changesSaveFailed: "Changes were not saved. Try again.",
   editAmount: "Edit amount", saveAmount: "Save amount", saveAmounts: "Save updated amounts", myExpenses: "My reports", amountUpdated: "Amount updated", amountUpdateFailed: "The amount was not updated. Try again.",
   settings: "Settings", about: "About", version: "Version", circles: "Your events", homeEyebrow: "Choose the gathering", homeTitleA: "Meet together.", homeTitleB: "Split fairly.", homeCopy: "Choose an event and begin. Group setup stays one tap away whenever details change.",
@@ -15,6 +16,7 @@ const en = {
 } as const;
 
 const he: Record<keyof typeof en, string> = {
+  filterByFamily: "סינון לפי משפחה", allFamilies: "כל המשפחות", sortReports: "מיון דיווחים", originalOrder: "סדר מקורי", sortByFamily: "לפי משפחה", sortByReporter: "לפי מדווח", noMatchingExpenses: "אין דיווחים השייכים למשפחה הזאת.",
   expenseTitle: "כותרת", expenseNotes: "הערה", editExpense: "עריכת דיווח", saveChanges: "שמירת שינויים", addReceiptLater: "הוספת קבלה", changesSaved: "השינויים נשמרו", changesSaveFailed: "השינויים לא נשמרו. נסו שוב.",
   editAmount: "עדכון סכום", saveAmount: "שמירת סכום", saveAmounts: "שמירת הסכומים המעודכנים", myExpenses: "הדיווחים שלי", amountUpdated: "הסכום עודכן", amountUpdateFailed: "הסכום לא עודכן. נסו שוב.",
   settings: "הגדרות", about: "אודות", version: "גרסה", circles: "האירועים שלכם", homeEyebrow: "בחירת אירוע", homeTitleA: "נפגשים יחד.", homeTitleB: "מתחלקים בהוגנות.", homeCopy: "בחרו אירוע והתחילו. הגדרת המשפחה או הקבוצה נשארת זמינה בלחיצה אחת.",

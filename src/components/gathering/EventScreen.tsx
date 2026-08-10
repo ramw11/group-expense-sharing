@@ -47,6 +47,8 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
   const [saved, setSaved] = useState(false);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string>();
+  const [expenseFamilyFilter, setExpenseFamilyFilter] = useState("");
+  const [expenseSort, setExpenseSort] = useState<"original" | "family" | "reporter">("original");
   const [eventShareUrl, setEventShareUrl] = useState("");
   const [eventShareLoading, setEventShareLoading] = useState(false);
   const [eventShareFailed, setEventShareFailed] = useState(false);
@@ -115,6 +117,16 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
     } catch { setScanState({ status: "failed", progress: 0 }); }
   };
   const totalPaid = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const visibleExpenses = useMemo(() => {
+    const filtered = expenseFamilyFilter ? expenses.filter((expense) => expense.billingUnitId === expenseFamilyFilter) : [...expenses];
+    if (expenseSort === "original") return filtered;
+    const collator = new Intl.Collator(language === "he" ? "he" : "en", { sensitivity: "base", numeric: true });
+    return filtered.sort((left, right) => {
+      const leftValue = expenseSort === "family" ? units.find((unit) => unit.id === left.billingUnitId)?.name : repositoryMembers.find((member) => member.id === left.reportedByMemberId)?.name;
+      const rightValue = expenseSort === "family" ? units.find((unit) => unit.id === right.billingUnitId)?.name : repositoryMembers.find((member) => member.id === right.reportedByMemberId)?.name;
+      return collator.compare(leftValue ?? "", rightValue ?? "") || collator.compare(left.description ?? "", right.description ?? "");
+    });
+  }, [expenseFamilyFilter, expenseSort, expenses, language, repositoryMembers, units]);
   const calculation = calculateEvent({ date, units, members, attendance, expenses, settings: calculationSettings });
   const settlements = createSettlements(calculation.unitSummaries);
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
@@ -199,6 +211,7 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
         <section className="expense-section">
           <header><div><p className="eyebrow">{t("moneyIn")}</p><h2>{t("whatPaid")}</h2></div><div className="expense-header-actions"><div className="expense-total"><span>{t("total")}</span><strong>{money(totalPaid)}</strong></div><button className="expense-form-toggle" onClick={() => setExpenseFormOpen((open) => !open)}>{expenseFormOpen ? <X size={18} /> : <Plus size={18} />}{expenseFormOpen ? t("closeExpenseForm") : t("newExpense")}</button></div></header>
           <div className="family-paid-summary" aria-label={t("paidByFamilies")}>{calculation.unitSummaries.map((summary) => <article key={summary.billingUnitId}><span>{unitName(summary.billingUnitId)}</span><strong>{money(summary.paid)}</strong></article>)}</div>
+          <div className="expense-list-controls"><label><span>{t("filterByFamily")}</span><select value={expenseFamilyFilter} onChange={(event) => { setExpenseFamilyFilter(event.target.value); setExpandedExpenseId(undefined); }}><option value="">{t("allFamilies")}</option>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label><label><span>{t("sortReports")}</span><select value={expenseSort} onChange={(event) => { setExpenseSort(event.target.value as "original" | "family" | "reporter"); setExpandedExpenseId(undefined); }}><option value="original">{t("originalOrder")}</option><option value="family">{t("sortByFamily")}</option><option value="reporter">{t("sortByReporter")}</option></select></label><strong>{visibleExpenses.length}/{expenses.length}</strong></div>
           <div className={`expense-grid ${expenseFormOpen ? "" : "form-closed"}`}>
             {expenseFormOpen && <div className="expense-entry">
               <label><span>{t("paidBy")}</span><select value={expenseUnitId} onChange={(event) => setExpenseUnitId(event.target.value)}>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
@@ -214,7 +227,7 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
               <button className="expense-add" onClick={addExpense} disabled={scanState.status === "scanning"}><Plus size={19} /> {t("addExpense")}</button>
             </div>}
             <div className="expense-list">
-              {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noExpenses")}</strong><span>{t("noExpensesCopy")}</span></div> : expenses.map((expense) => {
+              {expenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noExpenses")}</strong><span>{t("noExpensesCopy")}</span></div> : visibleExpenses.length === 0 ? <div className="expense-empty"><WalletCards size={30} /><strong>{t("noMatchingExpenses")}</strong></div> : visibleExpenses.map((expense) => {
                 const unit = units.find((item) => item.id === expense.billingUnitId);
                 const reporter = repositoryMembers.find((member) => member.id === expense.reportedByMemberId);
                 const expanded = expandedExpenseId === expense.id;
