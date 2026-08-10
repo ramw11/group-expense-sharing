@@ -1,6 +1,7 @@
 import type { Language } from "./domain/models";
 
 const en = {
+  editAmount: "Edit amount", saveAmount: "Save amount", myExpenses: "My reports", amountUpdated: "Amount updated", amountUpdateFailed: "The amount was not updated. Try again.",
   settings: "Settings", about: "About", version: "Version", circles: "Your events", homeEyebrow: "Choose the gathering", homeTitleA: "Meet together.", homeTitleB: "Split fairly.", homeCopy: "Choose an event and begin. Group setup stays one tap away whenever details change.",
   createTitle: "Create a new event", renameTitle: "Rename the event", groupPlaceholder: "e.g. Friday dinner", save: "Save", create: "Create", firstGroup: "Your first event starts here", firstGroupCopy: "Create a family gathering, trip, friends' night, or any shared event.", startEvent: "Start event", continueEvent: "Continue event", draftLabel: "Saved draft", manageGroup: "Manage group", rename: "Rename", delete: "Delete",
   allEvents: "All events", groupSetup: "Group setup", peopleReady: "people ready", startGathering: "Start gathering", whoPays: "Who pays together?", billingUnits: "Billing units", unitPlaceholder: "e.g. The Cohen family", add: "Add", member: "member", members: "members", selectUnit: "Select a unit", people: "People", memberName: "Member name", birthDate: "Birth date", manualWeight: "Manual weight", notes: "Notes (optional)", active: "Active", saveMember: "Save member", addMember: "Add member", noMembers: "No members yet.", born: "Born", weight: "Weight", defaultWeight: "Default weight",
@@ -13,6 +14,7 @@ const en = {
 } as const;
 
 const he: Record<keyof typeof en, string> = {
+  editAmount: "עדכון סכום", saveAmount: "שמירת סכום", myExpenses: "הדיווחים שלי", amountUpdated: "הסכום עודכן", amountUpdateFailed: "הסכום לא עודכן. נסו שוב.",
   settings: "הגדרות", about: "אודות", version: "גרסה", circles: "האירועים שלכם", homeEyebrow: "בחירת אירוע", homeTitleA: "נפגשים יחד.", homeTitleB: "מתחלקים בהוגנות.", homeCopy: "בחרו אירוע והתחילו. הגדרת המשפחה או הקבוצה נשארת זמינה בלחיצה אחת.",
   createTitle: "יצירת אירוע חדש", renameTitle: "שינוי שם האירוע", groupPlaceholder: "לדוגמה: ארוחת שישי", save: "שמירה", create: "יצירה", firstGroup: "האירוע הראשון מתחיל כאן", firstGroupCopy: "צרו מפגש משפחתי, טיול, ערב חברים או כל אירוע משותף.", startEvent: "התחלת אירוע", continueEvent: "המשך האירוע", draftLabel: "טיוטה שמורה", manageGroup: "הגדרת הקבוצה", rename: "שינוי שם", delete: "מחיקה",
   allEvents: "כל האירועים", groupSetup: "הגדרת הקבוצה", peopleReady: "אנשים מוכנים", startGathering: "התחלת אירוע", whoPays: "מי משלמים יחד?", billingUnits: "יחידות חיוב", unitPlaceholder: "לדוגמה: משפחת כהן", add: "הוספה", member: "חבר", members: "חברים", selectUnit: "בחרו יחידה", people: "אנשים", memberName: "שם החבר", birthDate: "תאריך לידה", manualWeight: "משקל ידני", notes: "הערות (לא חובה)", active: "פעיל", saveMember: "שמירת חבר", addMember: "הוספת חבר", noMembers: "עדיין אין חברים.", born: "תאריך לידה", weight: "משקל", defaultWeight: "משקל ברירת מחדל",

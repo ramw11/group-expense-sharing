@@ -276,3 +276,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
   .participant-receipt small { grid-column: 2/-1; }
   .home-tools .participant-trigger, .home-tools .participant-link-trigger { flex: 1; justify-content: center; }
 }
+.expense-amount-edit { width: 8rem; padding: .55rem .7rem; border: 1px solid var(--ink); border-radius: .65rem; font: inherit; font-weight: 700; }
+.participant-own-expense-list { display: grid; gap: .75rem; }
+.participant-own-expense { display: grid; grid-template-columns: minmax(0, 1fr) 8rem auto; gap: .75rem; align-items: center; padding: .85rem; border: 1px solid rgba(24,42,32,.18); border-radius: 1rem; }
+.participant-own-expense > div { display: grid; gap: .2rem; }
+.participant-own-expense span { color: var(--muted); font-size: .9rem; }
+.participant-own-expense input { min-width: 0; padding: .7rem; border: 1px solid rgba(24,42,32,.35); border-radius: .7rem; font: inherit; }
+.participant-own-expense button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .7rem .9rem; border: 0; border-radius: .7rem; background: var(--ink); color: white; font: inherit; font-weight: 700; }
+.participant-update-message { margin: .75rem 0 0; font-weight: 700; }
+@media (max-width: 640px) { .participant-own-expense { grid-template-columns: 1fr 7rem; } .participant-own-expense button { grid-column: 1 / -1; } }

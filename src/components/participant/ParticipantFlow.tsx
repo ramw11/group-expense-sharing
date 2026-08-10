@@ -59,11 +59,12 @@ interface ParticipantExpenseProps {
   onBack(): void;
   onManage(): void;
   onSubmit(expense: Expense): Promise<void>;
+  onUpdateAmount(expenseId: string, amount: number): Promise<void>;
 }
 
 type ScanState = { status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number };
 
-export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onManage, onSubmit }: ParticipantExpenseProps) {
+export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onManage, onSubmit, onUpdateAmount }: ParticipantExpenseProps) {
   const availableFamilies = families.filter((family) => event.familyIds.includes(family.id) && members.some((member) => member.billingUnitId === family.id && member.active));
   const [familyId, setFamilyId] = useState("");
   const availableMembers = useMemo(() => members.filter((member) => member.billingUnitId === familyId && member.active).sort((a, b) => a.order - b.order), [familyId, members]);
@@ -74,6 +75,9 @@ export function ParticipantExpense({ event, families, members, settings, languag
   const [scanState, setScanState] = useState<ScanState>({ status: "idle", progress: 0 });
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "saved" | "error">("idle");
   const [savedExpense, setSavedExpense] = useState<{ amount: number; family: string; reporter: string }>();
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  const [updatingExpenseId, setUpdatingExpenseId] = useState<string>();
+  const [updateMessage, setUpdateMessage] = useState("");
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
   const selectedFamily = availableFamilies.find((family) => family.id === familyId);
   const selectedMember = availableMembers.find((member) => member.id === memberId);
@@ -102,11 +106,24 @@ export function ParticipantExpense({ event, families, members, settings, languag
       setSubmitState("saved"); setAmount(""); setDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
     } catch { setSubmitState("error"); }
   };
+  const updateAmount = async (expense: Expense) => {
+    const nextAmount = Number(amountDrafts[expense.id] ?? expense.amount);
+    if (!Number.isFinite(nextAmount) || nextAmount <= 0) return;
+    setUpdatingExpenseId(expense.id); setUpdateMessage("");
+    try {
+      await onUpdateAmount(expense.id, nextAmount);
+      setAmountDrafts((current) => { const next = { ...current }; delete next[expense.id]; return next; });
+      setUpdateMessage(t("amountUpdated"));
+    } catch { setUpdateMessage(t("amountUpdateFailed")); }
+    finally { setUpdatingExpenseId(undefined); }
+  };
 
   return <div className="participant-shell">
     <header className="participant-topbar"><button className="participant-back" onClick={onBack}><ArrowLeft size={18} /> {t("chooseEvent")}</button><div><LanguageToggle language={language} onChange={onLanguageChange} dark /><button className="manager-entry" onClick={onManage}><LockKeyhole size={16} /> {t("managerArea")}</button></div></header>
     <main className="participant-main report-flow">
       <section className="report-event-title"><div><p className="eyebrow">{t("expenseForEvent")}</p><h1>{event.name}</h1><span><CalendarDays size={15} /> {event.date}</span></div><div className="report-step">1–2–3</div></section>
+
+      {event.expenses.length > 0 && <section className="participant-expense-card participant-own-expenses"><header><div><p className="eyebrow">{t("myExpenses")}</p><h2>{t("editAmount")}</h2></div><ReceiptText size={30} /></header><div className="participant-own-expense-list">{event.expenses.map((expense) => <div className="participant-own-expense" key={expense.id}><div><strong>{expense.description ?? t("expense")}</strong><span>{families.find((family) => family.id === expense.billingUnitId)?.name ?? t("unknownUnit")}</span></div><input aria-label={t("amount")} type="number" min="0.01" step="0.01" inputMode="decimal" value={amountDrafts[expense.id] ?? String(expense.amount)} onChange={(event) => setAmountDrafts((current) => ({ ...current, [expense.id]: event.target.value }))} /><button disabled={updatingExpenseId === expense.id} onClick={() => { void updateAmount(expense); }}>{updatingExpenseId === expense.id ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />} {t("saveAmount")}</button></div>)}</div>{updateMessage && <p className="participant-update-message">{updateMessage}</p>}</section>}
 
       <section className="identity-card"><header><div><p className="eyebrow">01</p><h2>{t("chooseYourFamily")}</h2></div><UsersRound size={27} /></header><div className="identity-options">{availableFamilies.map((family) => <button className={family.id === familyId ? "selected" : ""} key={family.id} onClick={() => chooseFamily(family.id)}><span>{family.id === familyId && <Check size={15} />}</span>{family.name}</button>)}</div></section>
 

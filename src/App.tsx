@@ -27,6 +27,7 @@ import {
   saveCloudSettings,
   saveCloudUnit,
   submitCloudExpense,
+  updateOwnExpenseAmount,
   subscribeToCloudGroup,
 } from "./cloud/repository";
 import { calculationSettingsFrom, defaultSettings, emptyPersistentData } from "./domain/defaults";
@@ -237,6 +238,10 @@ export default function App() {
     if (!event || connection?.role !== "participant" || connection.eventId !== eventId) throw new Error("Shared event not found");
     await runCloud(submitCloudExpense(connection.groupId, eventId, expense));
   };
+  const updateParticipantExpenseAmount = async (expenseId: string, amount: number) => {
+    if (!connection || connection.role !== "participant") throw new Error("Participant access required");
+    await runCloud(updateOwnExpenseAmount(expenseId, amount));
+  };
   const saveSettings = (settings: Settings) => {
     setData((current) => ({ ...current, settings }));
     if (connection?.role === "owner") void runCloud(saveCloudSettings(connection.groupId, settings)).catch(() => undefined);
@@ -254,7 +259,7 @@ export default function App() {
   }
   if (screen.name === "participant-expense") {
     const event = participantEvents.find((item) => item.id === screen.eventId);
-    if (event) return <ParticipantExpense event={event} families={repositoryFamilies} members={data.members} settings={data.settings} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "participant-home" })} onManage={() => { void openAdminAccess(); }} onSubmit={(expense) => submitParticipantExpense(event.id, expense)} />;
+    if (event) return <ParticipantExpense event={event} families={repositoryFamilies} members={data.members} settings={data.settings} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "participant-home" })} onManage={() => { void openAdminAccess(); }} onSubmit={(expense) => submitParticipantExpense(event.id, expense)} onUpdateAmount={updateParticipantExpenseAmount} />;
     return participantHome;
   }
   if (screen.name === "participant-home" || connection?.role !== "owner" || !primaryGroup) return participantHome;
