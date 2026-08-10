@@ -13,6 +13,7 @@ export interface CloudGroupSnapshot {
 
 export interface OwnerConnection { groupId: string }
 export interface InvitationRequest { token?: string; eventId?: string; legacyToken?: string }
+export interface AdminAccessStatus { groupId?: string; configured: boolean; isAdmin: boolean; canBootstrap: boolean }
 
 const throwIfError = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
 
@@ -73,6 +74,33 @@ export async function recoverOwnedGroup(preferredGroupId?: string): Promise<Owne
   throwIfError(result.error);
   const groupId = selectOwnedGroup((result.data ?? []).map((item) => item.group_id), preferredGroupId);
   return groupId ? { groupId } : undefined;
+}
+
+export async function getAdminAccessStatus(): Promise<AdminAccessStatus> {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("admin_access_status");
+  throwIfError(result.error);
+  const value = result.data as { group_id?: string; configured?: boolean; is_admin?: boolean; can_bootstrap?: boolean } | null;
+  return { groupId: value?.group_id, configured: Boolean(value?.configured), isAdmin: Boolean(value?.is_admin), canBootstrap: Boolean(value?.can_bootstrap) };
+}
+
+export async function bootstrapAdminCode(code: string) {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("bootstrap_admin_code", { admin_code: code });
+  throwIfError(result.error);
+  return result.data as string;
+}
+
+export async function loginAdmin(code: string) {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("login_admin", { admin_code: code });
+  throwIfError(result.error);
+  return result.data as string;
+}
+
+export async function changeAdminCode(code: string) {
+  await ensureAnonymousSession();
+  throwIfError((await supabase.rpc("change_admin_code", { admin_code: code })).error);
 }
 
 export async function createEventReportingToken(eventId: string) {

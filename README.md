@@ -64,6 +64,8 @@ cd group-expense-sharing
 npm ci
 ```
 
+Create a private Supabase project for this deployment, apply every file in `supabase/migrations` in chronological order, and copy `.env.example` to `.env.local` with that project's URL and publishable key. Each deployment is an independent private instance; never point a fork at another operator's Supabase project.
+
 ## Development
 
 ```bash
@@ -91,6 +93,8 @@ The production output is written to `dist/`.
 The workflow in `.github/workflows/deploy-pages.yml` tests, lints, builds, and deploys the application automatically whenever the stable `deployment` branch is updated. Ongoing development is kept on `dev`.
 
 The connected Supabase project uses the migrations in `supabase/migrations`. Anonymous sign-ins must be enabled under Authentication settings for passwordless group invitations.
+
+Configure the GitHub repository variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` before deploying. The stable administration entry is `?view=admin`; event reporting links are generated per event. The first administrator code is bootstrapped only by the legacy owner of an existing instance. A new installation must create its initial group through its controlled setup environment before exposing the site publicly.
 
 In the repository settings, select **GitHub Actions** as the GitHub Pages source. The Vite base path is derived automatically from the repository name during the workflow.
 

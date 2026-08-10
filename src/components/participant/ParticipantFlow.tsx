@@ -57,12 +57,13 @@ interface ParticipantExpenseProps {
   language: Language;
   onLanguageChange(language: Language): void;
   onBack(): void;
+  onManage(): void;
   onSubmit(expense: Expense): Promise<void>;
 }
 
 type ScanState = { status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number };
 
-export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onSubmit }: ParticipantExpenseProps) {
+export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onManage, onSubmit }: ParticipantExpenseProps) {
   const availableFamilies = families.filter((family) => event.familyIds.includes(family.id) && members.some((member) => member.billingUnitId === family.id && member.active));
   const [familyId, setFamilyId] = useState("");
   const availableMembers = useMemo(() => members.filter((member) => member.billingUnitId === familyId && member.active).sort((a, b) => a.order - b.order), [familyId, members]);
@@ -103,7 +104,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
   };
 
   return <div className="participant-shell">
-    <header className="participant-topbar"><button className="participant-back" onClick={onBack}><ArrowLeft size={18} /> {t("chooseEvent")}</button><LanguageToggle language={language} onChange={onLanguageChange} dark /></header>
+    <header className="participant-topbar"><button className="participant-back" onClick={onBack}><ArrowLeft size={18} /> {t("chooseEvent")}</button><div><LanguageToggle language={language} onChange={onLanguageChange} dark /><button className="manager-entry" onClick={onManage}><LockKeyhole size={16} /> {t("managerArea")}</button></div></header>
     <main className="participant-main report-flow">
       <section className="report-event-title"><div><p className="eyebrow">{t("expenseForEvent")}</p><h1>{event.name}</h1><span><CalendarDays size={15} /> {event.date}</span></div><div className="report-step">1–2–3</div></section>
 

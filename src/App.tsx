@@ -4,21 +4,24 @@ import { GroupHome } from "./components/groups/GroupHome";
 import { GroupWorkspace } from "./components/groups/GroupWorkspace";
 import { ParticipantExpense, ParticipantHome, ParticipantJoinState } from "./components/participant/ParticipantFlow";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
+import { AdminAccessScreen } from "./components/admin/AdminAccessScreen";
 import type { CloudGroupSnapshot } from "./cloud/repository";
 import {
   createEventReportingToken,
-  createSharedGroup,
+  bootstrapAdminCode,
+  changeAdminCode,
   completeLegacyStateMigration,
   deleteCloudEvent,
   deleteCloudMember,
   deleteCloudUnit,
   findAccessibleEvent,
+  getAdminAccessStatus,
   invitationUrl,
   joinLegacyGroup,
   joinSharedEvent,
+  loginAdmin,
   loadCloudGroup,
   parseInvitationUrl,
-  recoverOwnedGroup,
   saveCloudEvent,
   saveCloudMember,
   saveCloudSettings,
@@ -31,7 +34,7 @@ import type { BillingUnit, CloudConnection, Event, Expense, Language, Member, Pe
 import { discardLegacyBusinessData, loadDevicePreferences, loadLegacyBusinessData, saveDevicePreferences } from "./storage/localStorage";
 import { createId } from "./utils/id";
 
-type Screen = { name: "participant-home" } | { name: "participant-expense"; eventId: string } | { name: "admin-home" } | { name: "families" } | { name: "event"; eventId: string } | { name: "settings" };
+type Screen = { name: "participant-home" } | { name: "participant-expense"; eventId: string } | { name: "admin-access"; bootstrap: boolean } | { name: "admin-home" } | { name: "families" } | { name: "event"; eventId: string } | { name: "settings" };
 type CloudStatus = "idle" | "syncing" | "synced" | "error";
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -66,6 +69,7 @@ export default function App() {
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
   const [cloudMessage, setCloudMessage] = useState("");
   const incomingInvitation = useMemo(() => parseInvitationUrl(window.location.href), []);
+  const adminEntry = useMemo(() => new URL(window.location.href).searchParams.get("view") === "admin", []);
   const [inviteStatus, setInviteStatus] = useState<"none" | "joining" | "error">(incomingInvitation?.token || incomingInvitation?.legacyToken ? "joining" : "none");
   const bootstrapped = useRef(false);
   const language = data.settings.language;
@@ -99,7 +103,7 @@ export default function App() {
         if (incomingInvitation?.token) participantAccess = await joinSharedEvent(incomingInvitation.token);
         else if (incomingInvitation?.legacyToken) participantAccess = await joinLegacyGroup(incomingInvitation.legacyToken, incomingInvitation.eventId);
         else if (incomingInvitation?.eventId) participantAccess = await findAccessibleEvent(incomingInvitation.eventId);
-        else if (initialPreferences.participantEventId) participantAccess = await findAccessibleEvent(initialPreferences.participantEventId);
+        else if (!adminEntry && initialPreferences.participantEventId) participantAccess = await findAccessibleEvent(initialPreferences.participantEventId);
 
         if (participantAccess) {
           const snapshot = await refreshGroup(participantAccess.groupId);
@@ -114,14 +118,16 @@ export default function App() {
           return;
         }
 
-        const owner = await recoverOwnedGroup(initialPreferences.activeGroupId);
-        if (owner) {
-          const loaded = await loadCloudGroup(owner.groupId);
+        const adminStatus = await getAdminAccessStatus();
+        if (adminStatus.isAdmin && adminStatus.groupId) {
+          const loaded = await loadCloudGroup(adminStatus.groupId);
           const snapshot = await migrateLegacyOwnerState(loaded);
           setData((current) => snapshotData(current, snapshot));
-          setConnection({ groupId: owner.groupId, role: "owner" });
+          setConnection({ groupId: adminStatus.groupId, role: "owner" });
           setScreen({ name: "admin-home" });
           setCloudStatus("synced");
+        } else if (adminEntry || (adminStatus.canBootstrap && !adminStatus.configured)) {
+          setScreen({ name: "admin-access", bootstrap: adminStatus.canBootstrap && !adminStatus.configured });
         }
       } catch {
         if (incomingInvitation) setInviteStatus("error");
@@ -130,7 +136,7 @@ export default function App() {
       }
     };
     void bootstrap();
-  }, [incomingInvitation, initialPreferences.activeGroupId, initialPreferences.participantEventId, language]);
+  }, [adminEntry, incomingInvitation, initialPreferences.activeGroupId, initialPreferences.participantEventId, language]);
 
   useEffect(() => {
     if (!connection?.groupId) return;
@@ -160,17 +166,15 @@ export default function App() {
     }
   };
 
-  const initializeAdmin = async () => {
+  const openAdminAccess = async () => {
     setCloudStatus("syncing");
     try {
-      const recovered = await recoverOwnedGroup(initialPreferences.activeGroupId);
-      let groupId = recovered?.groupId;
+      const status = await getAdminAccessStatus();
+      const groupId = status.isAdmin ? status.groupId : undefined;
       if (!groupId) {
-        const legacy = loadLegacyBusinessData();
-        const source = legacy ?? { ...emptyPersistentData(), groups: [{ id: createId(), name: language === "he" ? "הקבוצה שלי" : "My group" }], settings: { ...defaultSettings, language } };
-        groupId = source.groups[0].id;
-        await createSharedGroup(source, groupId);
-        if (legacy) discardLegacyBusinessData();
+        setScreen({ name: "admin-access", bootstrap: status.canBootstrap && !status.configured });
+        setCloudStatus("idle");
+        return;
       }
       await refreshGroup(groupId);
       setConnection({ groupId, role: "owner" });
@@ -180,6 +184,19 @@ export default function App() {
       setCloudStatus("error");
       setCloudMessage(language === "he" ? "לא הצלחנו לפתוח את אזור הניהול" : "Could not open manager area");
     }
+  };
+
+  const authenticateAdmin = async (code: string, bootstrap: boolean) => {
+    const groupId = bootstrap ? await bootstrapAdminCode(code) : await loginAdmin(code);
+    const loaded = await loadCloudGroup(groupId);
+    const snapshot = await migrateLegacyOwnerState(loaded);
+    setData((current) => snapshotData(current, snapshot));
+    setConnection({ groupId, role: "owner" });
+    setScreen({ name: "admin-home" });
+    setCloudStatus("synced");
+    const url = new URL(window.location.href);
+    url.search = ""; url.hash = ""; url.searchParams.set("view", "admin");
+    window.history.replaceState(null, "", url.toString());
   };
 
   const setLanguage = (next: Language) => setData((current) => ({ ...current, settings: { ...current.settings, language: next } }));
@@ -225,18 +242,19 @@ export default function App() {
     if (connection?.role === "owner") void runCloud(saveCloudSettings(connection.groupId, settings)).catch(() => undefined);
   };
 
-  const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={participantEvents.length > 0} canManage={!connection || connection.role === "owner"} language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => { void initializeAdmin(); }} />;
+  const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={participantEvents.length > 0} canManage language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => { void openAdminAccess(); }} />;
 
   if (inviteStatus !== "none") return <ParticipantJoinState language={language} status={inviteStatus} onLanguageChange={setLanguage} />;
-  if (screen.name === "settings" && connection?.role === "owner") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onBack={() => setScreen({ name: "admin-home" })} />;
+  if (screen.name === "admin-access") return <AdminAccessScreen language={language} bootstrap={screen.bootstrap} onLanguageChange={setLanguage} onBack={() => setScreen(connection?.role === "participant" && connection.eventId ? { name: "participant-expense", eventId: connection.eventId } : { name: "participant-home" })} onSubmit={(code) => authenticateAdmin(code, screen.bootstrap)} />;
+  if (screen.name === "settings" && connection?.role === "owner") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onChangeAdminCode={changeAdminCode} onBack={() => setScreen({ name: "admin-home" })} />;
   if (screen.name === "families" && primaryGroup && connection?.role === "owner") return <GroupWorkspace group={primaryGroup} units={repositoryFamilies} members={data.members} events={data.events} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "admin-home" })} onAddUnit={(name) => { const family = { id: createId(), groupId: primaryGroup.id, name, order: repositoryFamilies.length }; setData((current) => ({ ...current, billingUnits: [...current.billingUnits, family] })); void runCloud(saveCloudUnit(family)).catch(() => undefined); }} onRenameUnit={(id, name) => { const family = data.billingUnits.find((item) => item.id === id); if (!family) return; const updated = { ...family, name }; setData((current) => ({ ...current, billingUnits: current.billingUnits.map((item) => item.id === id ? updated : item) })); void runCloud(saveCloudUnit(updated)).catch(() => undefined); }} onDeleteUnit={(id) => { if (data.events.some((event) => event.familyIds.includes(id))) return; setData((current) => ({ ...current, billingUnits: current.billingUnits.filter((unit) => unit.id !== id), members: current.members.filter((member) => member.billingUnitId !== id) })); void runCloud(deleteCloudUnit(id)).catch(() => undefined); }} onAddMember={(familyId, details) => { const member = { ...details, id: createId(), billingUnitId: familyId, order: data.members.filter((item) => item.billingUnitId === familyId).length }; setData((current) => ({ ...current, members: [...current.members, member] })); void runCloud(saveCloudMember(primaryGroup.id, member)).catch(() => undefined); }} onUpdateMember={(id, details) => { const member = data.members.find((item) => item.id === id); if (!member) return; const updated = { ...member, ...details }; setData((current) => ({ ...current, members: current.members.map((item) => item.id === id ? updated : item) })); void runCloud(saveCloudMember(primaryGroup.id, updated)).catch(() => undefined); }} onDeleteMember={(id) => { setData((current) => ({ ...current, members: current.members.filter((member) => member.id !== id) })); void runCloud(deleteCloudMember(id)).catch(() => undefined); }} onAssignFamily={assignFamily} onCreateEventWithFamily={(familyId, name) => createEvent(name, familyId)} />;
   if (screen.name === "event" && primaryGroup && connection?.role === "owner") {
     const event = data.events.find((item) => item.id === screen.eventId);
-    if (event) return <EventScreen key={`${event.id}:${event.updatedAt}:${event.expenses.length}`} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={event} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={createShareLink} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
+    if (event) return <EventScreen key={event.id} group={primaryGroup} repositoryFamilies={repositoryFamilies} repositoryMembers={data.members} settings={data.settings} language={language} draft={event} cloudStatus={cloudStatus} cloudMessage={cloudMessage} onLanguageChange={setLanguage} onSave={saveEvent} onShare={createShareLink} onCreateFamily={createFamily} onBack={() => setScreen({ name: "admin-home" })} onEditGroup={() => setScreen({ name: "families" })} />;
   }
   if (screen.name === "participant-expense") {
     const event = participantEvents.find((item) => item.id === screen.eventId);
-    if (event) return <ParticipantExpense event={event} families={repositoryFamilies} members={data.members} settings={data.settings} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "participant-home" })} onSubmit={(expense) => submitParticipantExpense(event.id, expense)} />;
+    if (event) return <ParticipantExpense event={event} families={repositoryFamilies} members={data.members} settings={data.settings} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "participant-home" })} onManage={() => { void openAdminAccess(); }} onSubmit={(expense) => submitParticipantExpense(event.id, expense)} />;
     return participantHome;
   }
   if (screen.name === "participant-home" || connection?.role !== "owner" || !primaryGroup) return participantHome;
