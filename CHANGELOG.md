@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a full manager calculation audit report with formulas, attendee weights, family breakdowns, reconciliation checks, and copy/download output.
 - Added manager and reporter editing of expense titles and notes.
 - Added late receipt upload and receipt replacement for existing expense reports.
 - Added manager-side expense filtering by family and sorting by family or reporter.

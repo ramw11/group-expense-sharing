@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Check, CheckCircle2, ChevronDown, CloudAlert, Copy, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, ChevronDown, CloudAlert, Copy, FileText, FolderPlus, Link2, LoaderCircle, Pencil, Plus, ReceiptText, RotateCcw, Save, Trash2, UsersRound, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Attendance, BillingUnit, Expense, Event, Group, Language, Member, Settings } from "../../domain/models";
 import { createId } from "../../utils/id";
@@ -9,6 +9,7 @@ import { recognizeReceiptAmount } from "../../utils/receiptOcr";
 import { LanguageToggle } from "../ui/LanguageToggle";
 import { ShareLinkPanel } from "../ui/ShareLinkPanel";
 import { calculationSettingsFrom } from "../../domain/defaults";
+import { CalculationAuditReport } from "./CalculationAuditReport";
 
 interface EventScreenProps {
   group: Group;
@@ -49,6 +50,7 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
   const [expandedExpenseId, setExpandedExpenseId] = useState<string>();
   const [expenseFamilyFilter, setExpenseFamilyFilter] = useState("");
   const [expenseSort, setExpenseSort] = useState<"original" | "family" | "reporter">("original");
+  const [auditOpen, setAuditOpen] = useState(false);
   const [eventShareUrl, setEventShareUrl] = useState("");
   const [eventShareLoading, setEventShareLoading] = useState(false);
   const [eventShareFailed, setEventShareFailed] = useState(false);
@@ -238,12 +240,13 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
         </section>
 
         <section className="settlement-section">
-          <header><div><p className="eyebrow">{t("finishLine")}</p><h2>{t("settledSimply")}</h2></div><div className="settlement-actions"><button className="copy-button" onClick={copyReport}>{copied ? <CheckCircle2 size={19} /> : <Copy size={19} />}{copied ? t("copied") : t("copyReport")}</button><button className="reset-button" onClick={reset}><RotateCcw size={18} /> {t("reset")}</button></div></header>
+          <header><div><p className="eyebrow">{t("finishLine")}</p><h2>{t("settledSimply")}</h2></div><div className="settlement-actions"><button className="audit-button" onClick={() => setAuditOpen((open) => !open)}><FileText size={19} />{language === "he" ? "דוח חישוב מלא" : "Full calculation report"}</button><button className="copy-button" onClick={copyReport}>{copied ? <CheckCircle2 size={19} /> : <Copy size={19} />}{copied ? t("copied") : t("copyReport")}</button><button className="reset-button" onClick={reset}><RotateCcw size={18} /> {t("reset")}</button></div></header>
           {calculation.totalWeight === 0 ? <div className="calculation-empty">{t("chooseAttendee")}</div> : calculation.totalPaid === 0 ? <div className="calculation-empty">{t("addExpensePrompt")}</div> : <>
             <div className="summary-metrics"><article><span>{t("totalSpent")}</span><strong>{money(calculation.totalPaid)}</strong></article><article><span>{t("totalWeight")}</span><strong>{calculation.totalWeight.toLocaleString()}</strong></article><article><span>{t("perShare")}</span><strong>{money(calculation.costPerWeight)}</strong></article></div>
             <div className="settlement-grid"><div className="balance-table"><div className="balance-head"><span>{t("billingUnit")}</span><span>{t("paid")}</span><span>{t("share")}</span><span>{t("balance")}</span></div>{calculation.unitSummaries.filter((item) => item.paid || item.share).map((item) => <div className="balance-row" key={item.billingUnitId}><strong>{unitName(item.billingUnitId)}</strong><span data-label={t("paid")}>{money(item.paid)}</span><span data-label={t("share")}>{money(item.share)}</span><b data-label={t("balance")} className={item.balance >= 0 ? "positive" : "negative"}>{item.balance >= 0 ? "+" : ""}{money(item.balance)}</b></div>)}</div>
               <aside className="payments-card"><p className="section-kicker">{t("whoPaysWhom")}</p>{settlements.length === 0 ? <div className="all-set"><Check size={25} /><strong>{t("allSettled")}</strong></div> : settlements.map((item, index) => <div className="payment-line" key={`${item.fromBillingUnitId}-${item.toBillingUnitId}`}><span>{index + 1}</span><p><strong>{unitName(item.fromBillingUnitId)}</strong> {t("pays")} <strong>{unitName(item.toBillingUnitId)}</strong></p><b>{money(item.amount)}</b></div>)}</aside>
             </div>
+            {auditOpen && <CalculationAuditReport eventName={eventName.trim() || group.name} eventDate={date} units={units} members={members} expenses={expenses} calculation={calculation} settlements={settlements} settings={calculationSettings} currency={settings.currency} language={language} onClose={() => setAuditOpen(false)} />}
           </>}
         </section>
       </main>
