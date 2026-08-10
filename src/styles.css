@@ -277,8 +277,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
   .home-tools .participant-trigger, .home-tools .participant-link-trigger { flex: 1; justify-content: center; }
 }
 .expense-amount-edit { width: 8rem; padding: .55rem .7rem; border: 1px solid var(--ink); border-radius: .65rem; font: inherit; font-weight: 700; }
-.expense-amount-save { width: 100%; margin-top: 1rem; padding: .85rem 1rem; display: flex; align-items: center; justify-content: center; gap: .5rem; border: 0; border-radius: .85rem; background: var(--lime); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; }
-.expense-amount-save.saved { background: #d9f7df; }
+.expense-amount-controls { display: flex; align-items: center; gap: .55rem; }
+.expense-inline-save { padding: .6rem .8rem; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 0; border-radius: .65rem; background: var(--lime); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .participant-own-expense-list { display: grid; gap: .75rem; }
 .participant-own-expense { display: grid; grid-template-columns: minmax(0, 1fr) 8rem auto; gap: .75rem; align-items: center; padding: .85rem; border: 1px solid rgba(24,42,32,.18); border-radius: 1rem; }
 .participant-own-expense > div { display: grid; gap: .2rem; }
