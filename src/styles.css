@@ -141,10 +141,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
 .expense-grid.form-closed { grid-template-columns: 1fr; }
 .expense-entry input, .expense-entry select { width: 100%; min-width: 0; }
 .expense-list .expense-log-card { display: block; min-height: 0; padding: 0; overflow: hidden; }
-.expense-list .expense-log-summary { display: grid; width: 100%; height: auto; min-height: 66px; grid-template-columns: 2.7rem minmax(0, 1fr) auto 1.3rem; align-items: center; gap: .65rem; padding: .55rem .7rem; border: 0; border-radius: 0; color: white; background: transparent; text-align: start; }
-.expense-log-summary > div:nth-child(2) { display: flex; min-width: 0; flex-direction: column; }
-.expense-log-summary > div:nth-child(2) strong, .expense-log-summary > div:nth-child(2) span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.expense-log-summary > b { color: var(--lime); white-space: nowrap; }
+.expense-list .expense-log-summary { display: grid; width: 100%; height: auto; min-height: 66px; grid-template-columns: 2.7rem minmax(0, 1fr) auto 1.3rem; align-items: center; justify-items: initial; gap: .65rem; padding: .55rem .7rem; border: 0; border-radius: 0; color: white; background: transparent; text-align: start; }
+.expense-log-summary > div:nth-child(2) { display: flex; min-width: 0; align-items: flex-start; justify-self: stretch; flex-direction: column; gap: .12rem; text-align: start; }
+.expense-log-summary > div:nth-child(2) strong, .expense-log-summary > div:nth-child(2) span { width: 100%; overflow: hidden; line-height: 1.35; text-overflow: ellipsis; unicode-bidi: plaintext; white-space: nowrap; }
+.expense-log-summary > b { justify-self: end; color: var(--lime); white-space: nowrap; }
+.expense-log-summary > .expense-chevron, .expense-log-summary > .expense-symbol, .expense-log-summary > .expense-receipt-thumb { justify-self: center; }
 .expense-chevron { transition: transform .2s; }
 .expense-log-card.expanded .expense-chevron { transform: rotate(180deg); }
 .expense-list .expense-log-details { display: grid; gap: .7rem; padding: .75rem; border-top: 1px solid #ffffff1d; background: #0e1e14; }

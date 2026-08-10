@@ -5,6 +5,7 @@
 - Added manager and reporter editing of expense titles and notes.
 - Added late receipt upload and receipt replacement for existing expense reports.
 - Added manager-side expense filtering by family and sorting by family or reporter.
+- Fixed expense-row alignment and bidirectional text isolation in Hebrew report metadata.
 
 ## 1.2.0 - 2026-08-10
 
