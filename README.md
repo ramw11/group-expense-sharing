@@ -35,6 +35,13 @@ Named user accounts, participant passwords, approval workflows, payment integrat
 
 ## Architecture
 
+Engineering and product handoff documents:
+
+- [`architecture/Group_Expense_Sharing_PRD.md`](architecture/Group_Expense_Sharing_PRD.md) — product requirements baseline
+- [`architecture/System_Engineering_Improvement_Plan_v1.0.md`](architecture/System_Engineering_Improvement_Plan_v1.0.md) — v1.0 stabilization and QA baseline
+- [`architecture/PROJECT_CONTEXT.md`](architecture/PROJECT_CONTEXT.md) — approved decisions, completed work, and current release status
+- [`architecture/CODEX_PROJECT_ONBOARDING.md`](architecture/CODEX_PROJECT_ONBOARDING.md) — recommended learning order and next steps for coding agents
+
 ```text
 src/
 ├── business/    Pure calculation and settlement functions
