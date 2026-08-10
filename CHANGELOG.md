@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added PNG and multi-page PDF export for the full visual calculation audit report.
+- Added a manager dashboard with family expense share, paid-versus-share balances, reporter totals, and largest-expense insights.
 - Changed participant weighting to always prefer a configured manual weight (including zero), then age-based weight, then the default weight of one.
 - Added a full manager calculation audit report with formulas, attendee weights, family breakdowns, reconciliation checks, and copy/download output.
 - Added manager and reporter editing of expense titles and notes.

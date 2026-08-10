@@ -1,5 +1,5 @@
-import { Check, Copy, Download, X } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, Download, FileImage, FileType2, LoaderCircle, X } from "lucide-react";
+import { useRef, useState } from "react";
 import type { EventCalculation, Settlement } from "../../business/calculations";
 import type { BillingUnit, CalculationSettings, Expense, Language, Member } from "../../domain/models";
 
@@ -24,6 +24,8 @@ const labels = {
 
 export function CalculationAuditReport({ eventName, eventDate, units, members, expenses, calculation, settlements, settings, currency, language, onClose }: CalculationAuditReportProps) {
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState<"pdf" | "image">();
+  const reportRef = useRef<HTMLElement>(null);
   const l = labels[language];
   const locale = language === "he" ? "he-IL" : "en";
   const money = (value: number) => new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
@@ -62,9 +64,52 @@ export function CalculationAuditReport({ eventName, eventDate, units, members, e
     const url = URL.createObjectURL(new Blob([reportText], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${eventName || "calculation"}-audit.txt`; anchor.click(); URL.revokeObjectURL(url);
   };
+  const safeFileName = (eventName || "calculation").replace(/[\\/:*?"<>|]/g, "-");
+  const captureReport = async () => {
+    if (!reportRef.current) throw new Error("Report is not available");
+    const { default: html2canvas } = await import("html2canvas");
+    return html2canvas(reportRef.current, {
+      backgroundColor: "#fffdf6",
+      scale: Math.min(window.devicePixelRatio || 1, 1.5),
+      useCORS: true,
+      logging: false,
+      onclone: (documentClone) => documentClone.querySelectorAll<HTMLElement>("[data-export-hide]").forEach((element) => { element.style.display = "none"; }),
+    });
+  };
+  const exportImage = async () => {
+    setExporting("image");
+    try {
+      const canvas = await captureReport();
+      const anchor = document.createElement("a");
+      anchor.download = `${safeFileName}-audit.png`;
+      anchor.href = canvas.toDataURL("image/png");
+      anchor.click();
+    } finally { setExporting(undefined); }
+  };
+  const exportPdf = async () => {
+    setExporting("pdf");
+    try {
+      const canvas = await captureReport();
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const imageWidth = pageWidth - margin * 2;
+      const imageHeight = canvas.height * imageWidth / canvas.width;
+      const image = canvas.toDataURL("image/jpeg", 0.94);
+      let offset = 0;
+      while (offset < imageHeight) {
+        if (offset > 0) pdf.addPage();
+        pdf.addImage(image, "JPEG", margin, margin - offset, imageWidth, imageHeight, undefined, "FAST");
+        offset += pageHeight - margin * 2;
+      }
+      pdf.save(`${safeFileName}-audit.pdf`);
+    } finally { setExporting(undefined); }
+  };
 
-  return <section className="audit-report" aria-label={l.title}>
-    <header><div><p>{eventDate}</p><h3>{l.title}</h3><span>{l.subtitle}</span></div><div><button onClick={() => { void copyReport(); }}><Copy size={17} /> {copied ? l.copied : l.copy}</button><button onClick={downloadReport}><Download size={17} /> {l.download}</button><button aria-label={l.close} onClick={onClose}><X size={18} /></button></div></header>
+  return <section className="audit-report" aria-label={l.title} ref={reportRef}>
+    <header><div><p>{eventDate}</p><h3>{l.title}</h3><span>{l.subtitle}</span></div><div data-export-hide><button onClick={() => { void copyReport(); }}><Copy size={17} /> {copied ? l.copied : l.copy}</button><button onClick={downloadReport}><Download size={17} /> {l.download}</button><button disabled={Boolean(exporting)} onClick={() => { void exportImage(); }}>{exporting === "image" ? <LoaderCircle className="spin" size={17} /> : <FileImage size={17} />} {language === "he" ? "תמונה" : "Image"}</button><button disabled={Boolean(exporting)} onClick={() => { void exportPdf(); }}>{exporting === "pdf" ? <LoaderCircle className="spin" size={17} /> : <FileType2 size={17} />} PDF</button><button aria-label={l.close} onClick={onClose}><X size={18} /></button></div></header>
     <div className="audit-checks"><strong>{l.checks}</strong>{checks.map((item) => <span className={item.ok ? "ok" : "error"} key={item.label}><Check size={15} /> {item.label}: {item.ok ? l.statusOk : l.statusError}</span>)}</div>
     <div className="audit-rules"><div><span>{l.settings}</span><strong>{language === "he" ? "משקל אישי ← גיל ← ברירת מחדל 1" : "Member weight → age → default 1"}</strong></div><div><span>{l.childRule}</span><strong>{settings.childAgeThreshold}</strong></div><div><span>{l.childWeight}</span><strong>{number(settings.childWeight)}</strong></div><div><span>{l.rounding}</span><strong>{roundingLabel}</strong></div></div>
     <div className="audit-formula"><span>{l.formula}</span><strong>{money(calculation.totalPaid)} ÷ {number(calculation.totalWeight)} = {money(calculation.costPerWeight)}</strong><p>{l.formulaCopy}</p></div>
