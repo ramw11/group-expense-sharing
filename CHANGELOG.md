@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the dashboard gradient donut with an export-safe SVG family pie chart and changed reporter analytics to a clear table.
 - Fixed dashboard PDF exports to use a consistent desktop-width layout, preserve readable scale across pages, and include the full family balance table.
 - Added a standalone PDF export of the dashboard with charts, insights, and the final payment summary, without calculation details.
 - Added PNG and multi-page PDF export for the full visual calculation audit report.
