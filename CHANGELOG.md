@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed clipped Hebrew glyphs and overflowing headings in dashboard PDF exports.
 - Replaced the paid-versus-share bar chart with a separate two-segment pie chart for every family.
 - Replaced the dashboard gradient donut with an export-safe SVG family pie chart and changed reporter analytics to a clear table.
 - Fixed dashboard PDF exports to use a consistent desktop-width layout, preserve readable scale across pages, and include the full family balance table.

@@ -41,8 +41,9 @@ export function ExpenseDashboard({ units, members, expenses, calculation, curren
     if (!dashboardRef.current || !chartsRef.current || !insightsRef.current || !summaryRef.current) return;
     setExporting(true);
     try {
+      await document.fonts.ready;
       const { default: html2canvas } = await import("html2canvas");
-      const captureOptions = { backgroundColor: "#182a20", scale: Math.min(window.devicePixelRatio || 1, 1.5), logging: false, windowWidth: 1280, onclone: (clone: Document) => { clone.querySelectorAll<HTMLElement>("[data-export-hide]").forEach((element) => { element.style.display = "none"; }); const dashboard = clone.querySelector<HTMLElement>(".expense-dashboard"); if (dashboard) { dashboard.style.width = "1120px"; dashboard.style.maxWidth = "none"; } } };
+      const captureOptions = { backgroundColor: "#182a20", scale: Math.min(window.devicePixelRatio || 1, 1.5), logging: false, windowWidth: 1280, onclone: (clone: Document) => { clone.querySelectorAll<HTMLElement>("[data-export-hide]").forEach((element) => { element.style.display = "none"; }); const dashboard = clone.querySelector<HTMLElement>(".expense-dashboard"); if (dashboard) { dashboard.classList.add("pdf-export-mode"); dashboard.style.width = "1120px"; dashboard.style.maxWidth = "none"; } } };
       const canvases = await Promise.all([html2canvas(chartsRef.current, captureOptions), html2canvas(insightsRef.current, captureOptions), html2canvas(summaryRef.current, captureOptions)]);
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
