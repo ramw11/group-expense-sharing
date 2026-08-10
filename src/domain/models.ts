@@ -28,6 +28,7 @@ export interface Expense {
   billingUnitId: Id;
   reportedByMemberId?: Id;
   description?: string;
+  notes?: string;
   amount: number;
   receiptUrl?: string;
   receiptPath?: string;

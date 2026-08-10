@@ -286,4 +286,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
 .participant-own-expense input { min-width: 0; padding: .7rem; border: 1px solid rgba(24,42,32,.35); border-radius: .7rem; font: inherit; }
 .participant-own-expense button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .7rem .9rem; border: 0; border-radius: .7rem; background: var(--ink); color: white; font: inherit; font-weight: 700; }
 .participant-update-message { margin: .75rem 0 0; font-weight: 700; }
-@media (max-width: 640px) { .participant-own-expense { grid-template-columns: 1fr 7rem; } .participant-own-expense button { grid-column: 1 / -1; } }
+.expense-edit-grid { display: grid; grid-template-columns: 1fr 1fr 9rem; gap: .75rem; }
+.expense-edit-grid label, .participant-own-expense > label { display: grid; gap: .35rem; font-weight: 700; }
+.expense-edit-grid input, .expense-edit-grid textarea, .participant-own-expense textarea { width: 100%; padding: .7rem; border: 1px solid rgba(24,42,32,.35); border-radius: .7rem; background: white; color: var(--ink); font: inherit; }
+.expense-edit-grid textarea, .participant-own-expense textarea { min-height: 4.5rem; resize: vertical; }
+.expense-receipt-editor, .participant-late-receipt { display: flex; align-items: center; gap: .75rem; padding: .7rem; border: 1px dashed rgba(24,42,32,.35); border-radius: .8rem; }
+.expense-receipt-editor img, .participant-late-receipt img { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: .55rem; }
+.expense-receipt-editor label, .participant-late-receipt label { cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; font-weight: 800; }
+.expense-edit-actions { display: flex; justify-content: space-between; gap: .75rem; margin-top: .8rem; }
+.participant-own-expense { grid-template-columns: 1fr 1fr 8rem; }
+.participant-own-expense .participant-late-receipt, .participant-own-expense > button { grid-column: span 1; }
+@media (max-width: 760px) { .expense-edit-grid, .participant-own-expense { grid-template-columns: 1fr; } .participant-own-expense .participant-late-receipt, .participant-own-expense > button { grid-column: 1; } .expense-edit-actions { flex-direction: column; } }
+@media (max-width: 640px) { .participant-own-expense { grid-template-columns: 1fr; } .participant-own-expense button { grid-column: 1; } }

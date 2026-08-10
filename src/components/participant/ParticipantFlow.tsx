@@ -59,23 +59,24 @@ interface ParticipantExpenseProps {
   onBack(): void;
   onManage(): void;
   onSubmit(expense: Expense): Promise<void>;
-  onUpdateAmount(expenseId: string, amount: number): Promise<void>;
+  onUpdate(expense: Expense): Promise<void>;
 }
 
 type ScanState = { status: "idle" | "scanning" | "found" | "missing" | "failed"; progress: number };
 
-export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onManage, onSubmit, onUpdateAmount }: ParticipantExpenseProps) {
+export function ParticipantExpense({ event, families, members, settings, language, onLanguageChange, onBack, onManage, onSubmit, onUpdate }: ParticipantExpenseProps) {
   const availableFamilies = families.filter((family) => event.familyIds.includes(family.id) && members.some((member) => member.billingUnitId === family.id && member.active));
   const [familyId, setFamilyId] = useState("");
   const availableMembers = useMemo(() => members.filter((member) => member.billingUnitId === familyId && member.active).sort((a, b) => a.order - b.order), [familyId, members]);
   const [memberId, setMemberId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const [receiptUrl, setReceiptUrl] = useState<string>();
   const [scanState, setScanState] = useState<ScanState>({ status: "idle", progress: 0 });
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "saved" | "error">("idle");
   const [savedExpense, setSavedExpense] = useState<{ amount: number; family: string; reporter: string }>();
-  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  const [expenseDrafts, setExpenseDrafts] = useState<Record<string, Expense>>({});
   const [updatingExpenseId, setUpdatingExpenseId] = useState<string>();
   const [updateMessage, setUpdateMessage] = useState("");
   const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
@@ -101,21 +102,26 @@ export function ParticipantExpense({ event, families, members, settings, languag
     if (!valid) return;
     setSubmitState("submitting");
     try {
-      await onSubmit({ id: createId(), billingUnitId: familyId, reportedByMemberId: memberId, amount: numericAmount, description: description.trim() || undefined, receiptUrl });
+      await onSubmit({ id: createId(), billingUnitId: familyId, reportedByMemberId: memberId, amount: numericAmount, description: description.trim() || undefined, notes: notes.trim() || undefined, receiptUrl });
       setSavedExpense({ amount: numericAmount, family: selectedFamily!.name, reporter: selectedMember!.name });
-      setSubmitState("saved"); setAmount(""); setDescription(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
+      setSubmitState("saved"); setAmount(""); setDescription(""); setNotes(""); setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 });
     } catch { setSubmitState("error"); }
   };
-  const updateAmount = async (expense: Expense) => {
-    const nextAmount = Number(amountDrafts[expense.id] ?? expense.amount);
-    if (!Number.isFinite(nextAmount) || nextAmount <= 0) return;
+  const updateExpense = async (expense: Expense) => {
+    const draft = expenseDrafts[expense.id] ?? expense;
+    if (!Number.isFinite(draft.amount) || draft.amount <= 0) return;
     setUpdatingExpenseId(expense.id); setUpdateMessage("");
     try {
-      await onUpdateAmount(expense.id, nextAmount);
-      setAmountDrafts((current) => { const next = { ...current }; delete next[expense.id]; return next; });
-      setUpdateMessage(t("amountUpdated"));
-    } catch { setUpdateMessage(t("amountUpdateFailed")); }
+      await onUpdate(draft);
+      setExpenseDrafts((current) => { const next = { ...current }; delete next[expense.id]; return next; });
+      setUpdateMessage(t("changesSaved"));
+    } catch { setUpdateMessage(t("changesSaveFailed")); }
     finally { setUpdatingExpenseId(undefined); }
+  };
+  const setExpenseDraft = (expense: Expense, changes: Partial<Expense>) => setExpenseDrafts((current) => ({ ...current, [expense.id]: { ...(current[expense.id] ?? expense), ...changes } }));
+  const attachLaterReceipt = async (expense: Expense, file?: File) => {
+    if (!file) return;
+    setExpenseDraft(expense, { receiptUrl: await prepareReceiptImage(file) });
   };
 
   return <div className="participant-shell">
@@ -123,7 +129,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
     <main className="participant-main report-flow">
       <section className="report-event-title"><div><p className="eyebrow">{t("expenseForEvent")}</p><h1>{event.name}</h1><span><CalendarDays size={15} /> {event.date}</span></div><div className="report-step">1–2–3</div></section>
 
-      {event.expenses.length > 0 && <section className="participant-expense-card participant-own-expenses"><header><div><p className="eyebrow">{t("myExpenses")}</p><h2>{t("editAmount")}</h2></div><ReceiptText size={30} /></header><div className="participant-own-expense-list">{event.expenses.map((expense) => <div className="participant-own-expense" key={expense.id}><div><strong>{expense.description ?? t("expense")}</strong><span>{families.find((family) => family.id === expense.billingUnitId)?.name ?? t("unknownUnit")}</span></div><input aria-label={t("amount")} type="number" min="0.01" step="0.01" inputMode="decimal" value={amountDrafts[expense.id] ?? String(expense.amount)} onChange={(event) => setAmountDrafts((current) => ({ ...current, [expense.id]: event.target.value }))} /><button disabled={updatingExpenseId === expense.id} onClick={() => { void updateAmount(expense); }}>{updatingExpenseId === expense.id ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />} {t("saveAmount")}</button></div>)}</div>{updateMessage && <p className="participant-update-message">{updateMessage}</p>}</section>}
+      {event.expenses.length > 0 && <section className="participant-expense-card participant-own-expenses"><header><div><p className="eyebrow">{t("myExpenses")}</p><h2>{t("editExpense")}</h2></div><ReceiptText size={30} /></header><div className="participant-own-expense-list">{event.expenses.map((expense) => { const draft = expenseDrafts[expense.id] ?? expense; return <div className="participant-own-expense" key={expense.id}><label><span>{t("expenseTitle")}</span><input value={draft.description ?? ""} onChange={(event) => setExpenseDraft(expense, { description: event.target.value })} /></label><label><span>{t("expenseNotes")}</span><textarea value={draft.notes ?? ""} onChange={(event) => setExpenseDraft(expense, { notes: event.target.value })} /></label><label><span>{t("amount")}</span><input type="number" min="0.01" step="0.01" inputMode="decimal" value={draft.amount} onChange={(event) => setExpenseDraft(expense, { amount: Number(event.target.value) })} /></label><div className="participant-late-receipt">{draft.receiptUrl && <img src={draft.receiptUrl} alt={t("receipt")} />}<input className="sr-only" id={`late-receipt-${expense.id}`} type="file" accept="image/*" capture="environment" onChange={(event) => { void attachLaterReceipt(expense, event.target.files?.[0]); event.target.value = ""; }} /><label htmlFor={`late-receipt-${expense.id}`}><Camera size={17} /> {draft.receiptUrl ? t("changeReceipt") : t("addReceiptLater")}</label></div><button disabled={updatingExpenseId === expense.id} onClick={() => { void updateExpense(expense); }}>{updatingExpenseId === expense.id ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />} {t("saveChanges")}</button></div>; })}</div>{updateMessage && <p className="participant-update-message">{updateMessage}</p>}</section>}
 
       <section className="identity-card"><header><div><p className="eyebrow">01</p><h2>{t("chooseYourFamily")}</h2></div><UsersRound size={27} /></header><div className="identity-options">{availableFamilies.map((family) => <button className={family.id === familyId ? "selected" : ""} key={family.id} onClick={() => chooseFamily(family.id)}><span>{family.id === familyId && <Check size={15} />}</span>{family.name}</button>)}</div></section>
 
@@ -133,6 +139,7 @@ export function ParticipantExpense({ event, families, members, settings, languag
         {submitState === "saved" ? <div className="participant-success"><div><Check size={28} /></div><h3>{t("expenseSaved")}</h3><p>{t("expenseSavedCopy")}</p>{savedExpense && <dl className="participant-confirmation"><div><dt>{t("amount")}</dt><dd>{money(savedExpense.amount)}</dd></div><div><dt>{t("billingUnit")}</dt><dd>{savedExpense.family}</dd></div><div><dt>{t("reportedBy")}</dt><dd>{savedExpense.reporter}</dd></div></dl>}<button onClick={() => setSubmitState("idle")}><Plus size={18} /> {t("reportAnother")}</button></div> : <div className="participant-expense-form">
           <label><span>{t("amount")}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => { setAmount(e.target.value); setSubmitState("idle"); }} placeholder="0.00" /></label>
           <label><span>{t("description")} <i>{t("optional")}</i></span><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("descPlaceholder")} /></label>
+          <label><span>{t("expenseNotes")} <i>{t("optional")}</i></span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
           <div className="participant-receipt"><input className="sr-only" id="participant-receipt" type="file" accept="image/*" capture="environment" onChange={(e) => { void scanReceipt(e.target.files?.[0]); e.target.value = ""; }} />{receiptUrl ? <img src={receiptUrl} alt={t("receipt")} /> : <div><Camera size={25} /></div>}<label htmlFor="participant-receipt"><Camera size={18} /> {receiptUrl ? t("changeReceipt") : t("takeReceipt")}</label><small>{scanState.status === "scanning" ? `${t("scanningReceipt")} ${scanState.progress}%` : scanState.status === "found" ? t("receiptAmountFound") : scanState.status === "missing" ? t("receiptAmountMissing") : scanState.status === "failed" ? t("receiptScanFailed") : t("receiptOptional")}</small>{receiptUrl && <button aria-label={t("removeReceipt")} onClick={() => { setReceiptUrl(undefined); setScanState({ status: "idle", progress: 0 }); }}><X size={16} /></button>}</div>
           {submitState === "error" && <p className="submit-error">{t("expenseSaveFailed")}</p>}
           <button className="participant-submit" disabled={!valid || submitState === "submitting" || scanState.status === "scanning"} onClick={() => { void submit(); }}>{submitState === "submitting" ? <LoaderCircle className="spin" size={20} /> : <Check size={20} />} {submitState === "submitting" ? t("submittingExpense") : `${t("submitExpense")}${valid ? ` · ${money(numericAmount)}` : ""}`}</button>

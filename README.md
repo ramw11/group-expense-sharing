@@ -20,6 +20,7 @@ The app has two deliberately simple flows. One manager maintains reusable famili
 - Camera-based receipt capture with on-device OCR amount detection
 - Participant reporting flow with event, family, and member selection
 - Reporter identity stored alongside each submitted expense
+- Reporter-owned correction of amount, title, note, and receipt after submission
 - Manager-only family, event, attendance, and settlement controls
 - Instant weighted-share and balance calculations
 - Suggested payments between billing units
@@ -100,7 +101,7 @@ In the repository settings, select **GitHub Actions** as the GitHub Pages source
 
 ## Data and privacy
 
-Families, members, events, attendance, expenses, reporter identity, calculation snapshots, and receipt associations are stored in Supabase. Compressed receipt images are stored in the private Supabase Storage bucket and loaded with signed URLs. OCR processing itself stays in the participant's browser and only suggests an editable amount. LocalStorage is limited to language, active-manager context, and the last opened participant event; legacy business data is removed after its one-time migration. Participants cannot change families, events, attendance, settlement settings, or existing expenses.
+Families, members, events, attendance, expenses, reporter identity, calculation snapshots, and receipt associations are stored in Supabase. Compressed receipt images are stored in the private Supabase Storage bucket and loaded with signed URLs. OCR processing itself stays in the participant's browser and only suggests an editable amount. LocalStorage is limited to language, active-manager context, and the last opened participant event; legacy business data is removed after its one-time migration. Participants cannot change families, events, attendance, or settlement settings; they may update only expense reports created by their own authenticated anonymous session.
 
 ## Versioning
 
