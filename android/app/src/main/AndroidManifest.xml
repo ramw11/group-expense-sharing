@@ -37,7 +37,7 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-
+    <!-- Required by Capacitor's embedded local web server. The Android
+         composition root does not load the Supabase application chunk. -->
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

@@ -28,7 +28,8 @@ export function AndroidDataManagement({ data, repository, receipts, onBack, onRe
       const expenses = backup.data.events.reduce((sum, event) => sum + event.expenses.length, 0);
       if (!window.confirm(`הגיבוי כולל ${events} אירועים ו-${expenses} הוצאות. להחליף את הנתונים המקומיים?`)) return;
       const safety = await createPortableBackup(data, async (expense) => expense.receiptPath ? receipts.read(expense.receiptPath) : expense.receiptUrl);
-      localStorage.setItem("android-pre-restore-safety-backup", JSON.stringify(safety));
+      const { Directory, Encoding, Filesystem } = await import("@capacitor/filesystem");
+      await Filesystem.writeFile({ path: "backups/pre-restore-safety.gesbackup", data: JSON.stringify(safety), directory: Directory.Data, encoding: Encoding.UTF8, recursive: true });
       const restored = await repository.replace(dataWithEmbeddedReceipts(backup));
       onRestored(restored); setStatus("השחזור הושלם בהצלחה");
     } catch (reason) { setStatus(reason instanceof Error ? reason.message : "שחזור הגיבוי נכשל"); }

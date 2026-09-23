@@ -2,9 +2,9 @@
 
 **Project:** Group Expense Sharing  
 **Repository:** `ramw11/group-expense-sharing`  
-**Current application version:** `1.2.0`
-**Last updated:** 2026-08-10  
-**Status:** v1.2.0 release prepared with shared manager access and protected expense corrections
+**Current application version:** `2.0.0`
+**Last updated:** 2026-09-23
+**Status:** Android Solo Admin Phase A implemented; private signed release prepared
 
 ## 1. Purpose of this document
 
@@ -17,6 +17,14 @@ The governing documents are:
 3. This document — implementation history, approved decisions, and current handoff state.
 
 If these documents appear to conflict, do not silently choose an implementation. Apply the precedence above and update the relevant architecture document when a material architectural decision changes.
+
+The Android Solo Admin edition is additionally governed by
+`Android_Solo_Admin_PRD_v1.0.md` and
+`Android_Solo_Admin_Implementation_Plan_v1.0.md`. It is a separate local-only
+composition: it uses SQLite and private receipt files, does not load the web
+Supabase composition, and has no participant or manager-code flow. Phase A was
+implemented for v2.0.0. The web edition and its production Supabase data remain
+available and unchanged; migration to Android is a non-destructive backup copy.
 
 ## 2. Product intent
 

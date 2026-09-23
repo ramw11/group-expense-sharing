@@ -9,6 +9,7 @@ import { AndroidDataRepository } from "../../infrastructure/local/androidDataRep
 import { AndroidReceiptStore } from "../../infrastructure/local/androidReceiptStore";
 import { AndroidDataManagement } from "./AndroidDataManagement";
 import { createId } from "../../utils/id";
+import { dataWithEmbeddedReceipts, parsePortableBackup } from "../../application/portableBackup";
 
 type Screen = { name: "home" } | { name: "families" } | { name: "settings" } | { name: "data" } | { name: "event"; eventId: string };
 const receiptStore = new AndroidReceiptStore();
@@ -21,6 +22,7 @@ export function AndroidApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [groupName, setGroupName] = useState("");
+  const [importing, setImporting] = useState(false);
   const primaryGroup = data.groups[0];
   const language = data.settings.language;
   const families = useMemo(() => primaryGroup ? data.billingUnits.filter((unit) => unit.groupId === primaryGroup.id) : [], [data.billingUnits, primaryGroup]);
@@ -67,7 +69,7 @@ export function AndroidApp() {
   const createFamily = (family: BillingUnit, members: Member[]) => commit((current) => ({ ...current, billingUnits: [...current.billingUnits, family], members: [...current.members, ...members] }));
 
   if (loading) return <main className="android-state"><img src="/favicon.svg" alt="" /><h1>מתחלקים</h1><p>פותח את הנתונים המקומיים…</p></main>;
-  if (!primaryGroup) return <main className="android-onboarding" dir="rtl"><img src="/favicon.svg" alt="לוגו מתחלקים" /><p>האפליקציה הפרטית שלך</p><h1>מתחילים מקבוצה אחת מסודרת.</h1><label><span>שם הקבוצה</span><input autoFocus value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="לדוגמה: המשפחה שלנו" /></label><button disabled={!groupName.trim()} onClick={() => { const group = { id: createId(), name: groupName.trim() }; commit((current) => ({ ...current, groups: [group], settings: { ...defaultSettings, language: "he" } })); }}>יצירת קבוצה מקומית</button>{error && <p className="submit-error">{error}</p>}</main>;
+  if (!primaryGroup) return <main className="android-onboarding" dir="rtl"><img src="/favicon.svg" alt="לוגו מתחלקים" /><p>האפליקציה הפרטית שלך</p><h1>מתחילים מקבוצה אחת מסודרת.</h1><label><span>שם הקבוצה</span><input autoFocus value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="לדוגמה: המשפחה שלנו" /></label><button disabled={!groupName.trim() || importing} onClick={() => { const group = { id: createId(), name: groupName.trim() }; commit((current) => ({ ...current, groups: [group], settings: { ...defaultSettings, language: "he" } })); }}>יצירת קבוצה מקומית</button><div className="onboarding-divider"><span>או</span></div><input hidden id="onboarding-backup" type="file" accept=".gesbackup,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; setImporting(true); void file.text().then(parsePortableBackup).then((backup) => repository.replace(dataWithEmbeddedReceipts(backup))).then(setData).catch((reason) => setError(reason instanceof Error ? reason.message : "הייבוא נכשל")).finally(() => setImporting(false)); }} /><label className="onboarding-import" htmlFor="onboarding-backup">{importing ? "מייבא את הנתונים…" : "ייבוא גיבוי מהאתר או מהאפליקציה"}</label>{error && <p className="submit-error">{error}</p>}</main>;
 
   const status = error ? "error" as const : "idle" as const;
   if (screen.name === "data") return <AndroidDataManagement data={data} repository={repository} receipts={receiptStore} onBack={() => setScreen({ name: "settings" })} onRestored={(restored) => { setData(restored); setScreen({ name: "home" }); }} />;
