@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+import groovy.json.JsonSlurper
+
+def productPackage = new JsonSlurper().parse(file('../../package.json'))
+def productVersion = productPackage.version as String
+def versionParts = productVersion.tokenize('.').collect { it as Integer }
+def signingPropertiesFile = file('../../release-artifacts/signing/keystore.properties')
+def signingProperties = new Properties()
+if (signingPropertiesFile.exists()) signingProperties.load(new FileInputStream(signingPropertiesFile))
+
 android {
     namespace = "com.ramw11.groupexpenses"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +16,8 @@ android {
         applicationId "com.ramw11.groupexpenses"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+        versionName productVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +25,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (signingPropertiesFile.exists()) {
+                storeFile file("../../release-artifacts/signing/${signingProperties['storeFile']}")
+                storePassword signingProperties['storePassword']
+                keyAlias signingProperties['keyAlias']
+                keyPassword signingProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (signingPropertiesFile.exists()) signingConfig signingConfigs.release
+        }
+    }
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach {
+            outputFileName = "mitchalkim-v${productVersion}-${variant.buildType.name}.apk"
         }
     }
 }

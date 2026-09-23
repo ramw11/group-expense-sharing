@@ -2,6 +2,12 @@
 
 A polished, Hebrew-first Progressive Web App for collecting and settling group expenses across families, couples, individuals, teams, or any other group.
 
+The repository also contains a private Android Solo Admin edition. That edition
+runs fully from local SQLite and application-private files: one administrator
+maintains all families, events, expenses, receipts, calculations, reports, and
+backups on one phone. It does not load the Supabase composition used by the web
+edition.
+
 The app has two deliberately simple flows. One manager maintains reusable families, events, attendance, calculations, and the final report. Participants open an event-specific reporting link, choose their family and name, then submit an expense manually or from a receipt photo. No participant account or password is required. Supabase is the authoritative store for shared business data; LocalStorage contains device preferences only. The architecture remains suitable for future Capacitor-based Android packaging without coupling business rules to the UI or persistence layer.
 
 ## Features
@@ -72,6 +78,17 @@ Create a private Supabase project for this deployment, apply every file in `supa
 ```bash
 npm run dev
 ```
+
+Build and synchronize the local Android edition:
+
+```bash
+npm run android:sync
+cd android
+./gradlew assembleDebug
+```
+
+Private release APKs are signed from ignored material under
+`release-artifacts/signing/`; never commit that directory or an APK.
 
 Run automated checks:
 

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 2.0.0 - 2026-09-23
+
+- Added a complete single-administrator Android edition that runs locally in Capacitor without loading the Supabase application.
+- Added versioned SQLite persistence and application-private receipt files with serialized writes and restart-safe state.
+- Added direct offline management of families, members, events, attendance, expenses, receipts, calculations, dashboard, and settlements.
+- Made the expense reporter mandatory in Android and derive the paying family from that reporter; editing the reporter updates the family.
+- Added Android Sharesheet export for dashboard PDFs, calculation PDFs, images, and text reports.
+- Added checksummed portable backup, transactional restore with a private safety copy, first-run import, and non-destructive web export for migration from Supabase.
+- Added branded Android launcher icons and splash screens, semantic Android version codes, and named APK output files.
+- Preserved the deployed web edition and existing Supabase data without schema or production-data changes.
+
 - Replaced the dashboard PDF's canvas text renderer with browser-native DOM image capture to prevent Hebrew bold-text clipping throughout the report.
 - Corrected vertical alignment and clipping inside exported balance badges and bold family labels.
 - Fixed clipped Hebrew glyphs and overflowing headings in dashboard PDF exports.
