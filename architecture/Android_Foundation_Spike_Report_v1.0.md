@@ -4,7 +4,7 @@
 
 **Branch:** `feature/android-foundation-spike`
 
-**Status:** Emulator verification complete; physical-device verification pending
+**Status:** Complete; emulator and physical-device verification passed
 
 ## Scope
 
@@ -66,14 +66,8 @@ Verified on the existing Android Studio AVD `poco_x5_pro_5g`:
 - The initial Gradle build emitted upstream unchecked/deprecation warnings from Capacitor plugins but completed successfully.
 - Capacitor SystemBars uses recommended native inset handling to avoid early CSS injection errors and layout glitches.
 
-## Remaining Sprint A0 gate
+## Physical-device gate
 
-Install the debug APK on the administrator's physical Android phone and repeat:
-
-- application launch;
-- SQLite write/read;
-- selection of a real receipt from the device;
-- private file copy verification through the on-screen success result;
-- app restart and a second SQLite run.
-
-The foundation branch must not merge into `dev` until this physical-device smoke test passes or the implementation plan is explicitly amended.
+The administrator installed the spike APK on the target Android phone and confirmed
+that the Sprint A0 smoke test passed on 2026-09-23. Sprint A0 is therefore approved
+for integration into `dev`.
