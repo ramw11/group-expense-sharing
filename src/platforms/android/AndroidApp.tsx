@@ -7,10 +7,12 @@ import { calculationSettingsFrom, defaultSettings, emptyPersistentData } from ".
 import type { BillingUnit, Event, Language, Member, PersistentData, Settings } from "../../domain/models";
 import { AndroidDataRepository } from "../../infrastructure/local/androidDataRepository";
 import { AndroidReceiptStore } from "../../infrastructure/local/androidReceiptStore";
+import { AndroidDataManagement } from "./AndroidDataManagement";
 import { createId } from "../../utils/id";
 
-type Screen = { name: "home" } | { name: "families" } | { name: "settings" } | { name: "event"; eventId: string };
-const repository = new AndroidDataRepository(new AndroidReceiptStore());
+type Screen = { name: "home" } | { name: "families" } | { name: "settings" } | { name: "data" } | { name: "event"; eventId: string };
+const receiptStore = new AndroidReceiptStore();
+const repository = new AndroidDataRepository(receiptStore);
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function AndroidApp() {
@@ -68,7 +70,8 @@ export function AndroidApp() {
   if (!primaryGroup) return <main className="android-onboarding" dir="rtl"><img src="/favicon.svg" alt="לוגו מתחלקים" /><p>האפליקציה הפרטית שלך</p><h1>מתחילים מקבוצה אחת מסודרת.</h1><label><span>שם הקבוצה</span><input autoFocus value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="לדוגמה: המשפחה שלנו" /></label><button disabled={!groupName.trim()} onClick={() => { const group = { id: createId(), name: groupName.trim() }; commit((current) => ({ ...current, groups: [group], settings: { ...defaultSettings, language: "he" } })); }}>יצירת קבוצה מקומית</button>{error && <p className="submit-error">{error}</p>}</main>;
 
   const status = error ? "error" as const : "idle" as const;
-  if (screen.name === "settings") return <div className="android-app"><SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onBack={() => setScreen({ name: "home" })} />{error && <div className="android-error">{error}</div>}</div>;
+  if (screen.name === "data") return <AndroidDataManagement data={data} repository={repository} receipts={receiptStore} onBack={() => setScreen({ name: "settings" })} onRestored={(restored) => { setData(restored); setScreen({ name: "home" }); }} />;
+  if (screen.name === "settings") return <div className="android-app"><SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onDataManagement={() => setScreen({ name: "data" })} onBack={() => setScreen({ name: "home" })} />{error && <div className="android-error">{error}</div>}</div>;
   if (screen.name === "families") return <div className="android-app"><GroupWorkspace group={primaryGroup} units={families} members={data.members} events={data.events} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "home" })} onAddUnit={(name) => commit((current) => ({ ...current, billingUnits: [...current.billingUnits, { id: createId(), groupId: primaryGroup.id, name, order: families.length }] }))} onRenameUnit={(id, name) => commit((current) => ({ ...current, billingUnits: current.billingUnits.map((item) => item.id === id ? { ...item, name } : item) }))} onDeleteUnit={(id) => { if (data.events.some((event) => event.familyIds.includes(id)) || !window.confirm("למחוק את המשפחה וכל חבריה?")) return; commit((current) => ({ ...current, billingUnits: current.billingUnits.filter((item) => item.id !== id), members: current.members.filter((member) => member.billingUnitId !== id) })); }} onAddMember={(familyId, details) => commit((current) => ({ ...current, members: [...current.members, { ...details, id: createId(), billingUnitId: familyId, order: current.members.filter((item) => item.billingUnitId === familyId).length }] }))} onUpdateMember={(id, details) => commit((current) => ({ ...current, members: current.members.map((item) => item.id === id ? { ...item, ...details } : item) }))} onDeleteMember={(id) => { if (!window.confirm("למחוק את החבר?")) return; commit((current) => ({ ...current, members: current.members.filter((item) => item.id !== id), events: current.events.map((event) => ({ ...event, attendance: event.attendance.filter((item) => item.memberId !== id), expenses: event.expenses.filter((expense) => expense.reportedByMemberId !== id) })) })); }} onAssignFamily={assignFamily} onCreateEventWithFamily={(familyId, name) => createEvent(name, familyId)} />{error && <div className="android-error">{error}</div>}</div>;
   if (screen.name === "event") {
     const event = data.events.find((item) => item.id === screen.eventId);
