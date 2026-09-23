@@ -13,6 +13,7 @@ export interface CloudGroupSnapshot {
 
 export interface OwnerConnection { groupId: string }
 export interface InvitationRequest { token?: string; eventId?: string; legacyToken?: string }
+export interface AdminAccessStatus { groupId?: string; configured: boolean; isAdmin: boolean; canBootstrap: boolean }
 
 const throwIfError = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
 
@@ -75,6 +76,33 @@ export async function recoverOwnedGroup(preferredGroupId?: string): Promise<Owne
   return groupId ? { groupId } : undefined;
 }
 
+export async function getAdminAccessStatus(): Promise<AdminAccessStatus> {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("admin_access_status");
+  throwIfError(result.error);
+  const value = result.data as { group_id?: string; configured?: boolean; is_admin?: boolean; can_bootstrap?: boolean } | null;
+  return { groupId: value?.group_id, configured: Boolean(value?.configured), isAdmin: Boolean(value?.is_admin), canBootstrap: Boolean(value?.can_bootstrap) };
+}
+
+export async function bootstrapAdminCode(code: string) {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("bootstrap_admin_code", { admin_code: code });
+  throwIfError(result.error);
+  return result.data as string;
+}
+
+export async function loginAdmin(code: string) {
+  await ensureAnonymousSession();
+  const result = await supabase.rpc("login_admin", { admin_code: code });
+  throwIfError(result.error);
+  return result.data as string;
+}
+
+export async function changeAdminCode(code: string) {
+  await ensureAnonymousSession();
+  throwIfError((await supabase.rpc("change_admin_code", { admin_code: code })).error);
+}
+
 export async function createEventReportingToken(eventId: string) {
   await ensureAnonymousSession();
   const result = await supabase.rpc("create_event_invite", { target_event_id: eventId });
@@ -135,7 +163,7 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
   const [linksResult, attendanceResult, expensesResult] = await Promise.all([
     supabase.from("event_families").select("event_id,family_id").in("event_id", eventIds),
     supabase.from("attendance").select("event_id,member_id,present").in("event_id", eventIds),
-    supabase.from("expenses").select("id,event_id,billing_unit_id,reported_by_member_id,description,amount,receipt_path").in("event_id", eventIds).is("deleted_at", null),
+    supabase.from("expenses").select("id,event_id,billing_unit_id,reported_by_member_id,description,notes,amount,receipt_path").in("event_id", eventIds).is("deleted_at", null),
   ]);
   throwIfError(linksResult.error); throwIfError(attendanceResult.error); throwIfError(expensesResult.error);
   const events = await Promise.all(eventResult.data.map(async (event): Promise<Event> => ({
@@ -157,6 +185,7 @@ export async function loadCloudGroup(groupId: string): Promise<CloudGroupSnapsho
       billingUnitId: expense.billing_unit_id,
       reportedByMemberId: expense.reported_by_member_id ?? undefined,
       description: expense.description ?? undefined,
+      notes: expense.notes ?? undefined,
       amount: Number(expense.amount),
       receiptPath: expense.receipt_path ?? undefined,
       receiptUrl: await signedReceiptUrl(expense.receipt_path),
@@ -219,7 +248,12 @@ export async function saveCloudEvent(groupId: string, event: Event, previous?: E
   if (removedMemberIds.length) throwIfError((await supabase.from("attendance").delete().eq("event_id", event.id).in("member_id", removedMemberIds)).error);
   for (const expense of event.expenses) {
     const receiptPath = await uploadReceipt(groupId, event.id, expense, true);
-    throwIfError((await supabase.from("expenses").upsert({ id: expense.id, event_id: event.id, group_id: groupId, billing_unit_id: expense.billingUnitId, reported_by_member_id: expense.reportedByMemberId, description: expense.description, amount: expense.amount, receipt_path: receiptPath, updated_by: user.id, updated_at: event.updatedAt, deleted_at: null })).error);
+    const values = { id: expense.id, event_id: event.id, group_id: groupId, billing_unit_id: expense.billingUnitId, reported_by_member_id: expense.reportedByMemberId, description: expense.description, notes: expense.notes, amount: expense.amount, receipt_path: receiptPath, updated_by: user.id, updated_at: event.updatedAt, deleted_at: null };
+    const existing = previous?.expenses.some((item) => item.id === expense.id);
+    const result = existing
+      ? await supabase.from("expenses").update(values).eq("id", expense.id)
+      : await supabase.from("expenses").insert({ ...values, created_by: user.id });
+    throwIfError(result.error);
   }
   const removedExpenseIds = previous?.expenses.filter((expense) => !event.expenses.some((current) => current.id === expense.id)).map((expense) => expense.id) ?? [];
   if (removedExpenseIds.length) throwIfError((await supabase.from("expenses").update({ deleted_at: new Date().toISOString(), updated_by: user.id }).in("id", removedExpenseIds)).error);
@@ -228,7 +262,13 @@ export async function saveCloudEvent(groupId: string, event: Event, previous?: E
 export async function submitCloudExpense(groupId: string, eventId: string, expense: Expense) {
   const user = await ensureAnonymousSession();
   const receiptPath = await uploadReceipt(groupId, eventId, expense, false);
-  throwIfError((await supabase.from("expenses").insert({ id: expense.id, event_id: eventId, group_id: groupId, billing_unit_id: expense.billingUnitId, reported_by_member_id: expense.reportedByMemberId, description: expense.description, amount: expense.amount, receipt_path: receiptPath, updated_by: user.id, updated_at: new Date().toISOString() })).error);
+  throwIfError((await supabase.from("expenses").insert({ id: expense.id, event_id: eventId, group_id: groupId, billing_unit_id: expense.billingUnitId, reported_by_member_id: expense.reportedByMemberId, description: expense.description, notes: expense.notes, amount: expense.amount, receipt_path: receiptPath, created_by: user.id, updated_by: user.id, updated_at: new Date().toISOString() })).error);
+}
+
+export async function updateOwnExpense(groupId: string, eventId: string, expense: Expense) {
+  await ensureAnonymousSession();
+  const receiptPath = await uploadReceipt(groupId, eventId, expense, Boolean(expense.receiptPath));
+  throwIfError((await supabase.rpc("update_own_expense", { target_expense_id: expense.id, new_amount: expense.amount, new_title: expense.description ?? "", new_notes: expense.notes ?? "", new_receipt_path: receiptPath ?? null })).error);
 }
 
 export async function deleteCloudEvent(eventId: string) { await ensureAnonymousSession(); throwIfError((await supabase.from("events").delete().eq("id", eventId)).error); }

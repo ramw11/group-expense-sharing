@@ -38,7 +38,7 @@ export const ageOnDate = (birthDate: string, onDate: string): number => {
 };
 
 export const memberWeight = (member: Member, eventDate: string, settings: CalculationSettings): number => {
-  if (settings.weightMode === "manual") return member.manualWeight ?? 1;
+  if (member.manualWeight != null) return member.manualWeight;
   if (!member.birthDate) return 1;
   return ageOnDate(member.birthDate, eventDate) < settings.childAgeThreshold ? settings.childWeight : 1;
 };

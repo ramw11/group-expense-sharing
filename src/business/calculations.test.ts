@@ -18,9 +18,12 @@ describe("expense calculations", () => {
     expect(ageOnDate("2014-08-07", "2026-08-07")).toBe(12);
   });
 
-  it("uses birth date in automatic mode and manual weight in manual mode", () => {
+  it("prioritizes manual weight, then birth date, then the default weight", () => {
     expect(memberWeight(members[1], "2026-08-07", defaultSettings)).toBe(0.5);
-    expect(memberWeight({ ...members[1], manualWeight: 0.75 }, "2026-08-07", { ...defaultSettings, weightMode: "manual" })).toBe(0.75);
+    expect(memberWeight({ ...members[1], manualWeight: 0.75 }, "2026-08-07", defaultSettings)).toBe(0.75);
+    expect(memberWeight({ ...members[1], manualWeight: 0 }, "2026-08-07", defaultSettings)).toBe(0);
+    expect(memberWeight({ ...members[1], birthDate: undefined }, "2026-08-07", defaultSettings)).toBe(1);
+    expect(memberWeight(members[1], "2026-08-07", { ...defaultSettings, weightMode: "manual" })).toBe(0.5);
   });
 
   it("splits expenses by attendee weight and billing unit", () => {

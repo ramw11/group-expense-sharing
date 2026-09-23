@@ -2,6 +2,12 @@
 
 A polished, Hebrew-first Progressive Web App for collecting and settling group expenses across families, couples, individuals, teams, or any other group.
 
+The repository also contains a private Android Solo Admin edition. That edition
+runs fully from local SQLite and application-private files: one administrator
+maintains all families, events, expenses, receipts, calculations, reports, and
+backups on one phone. It does not load the Supabase composition used by the web
+edition.
+
 The app has two deliberately simple flows. One manager maintains reusable families, events, attendance, calculations, and the final report. Participants open an event-specific reporting link, choose their family and name, then submit an expense manually or from a receipt photo. No participant account or password is required. Supabase is the authoritative store for shared business data; LocalStorage contains device preferences only. The architecture remains suitable for future Capacitor-based Android packaging without coupling business rules to the UI or persistence layer.
 
 ## Features
@@ -20,6 +26,7 @@ The app has two deliberately simple flows. One manager maintains reusable famili
 - Camera-based receipt capture with on-device OCR amount detection
 - Participant reporting flow with event, family, and member selection
 - Reporter identity stored alongside each submitted expense
+- Reporter-owned correction of amount, title, note, and receipt after submission
 - Manager-only family, event, attendance, and settlement controls
 - Instant weighted-share and balance calculations
 - Suggested payments between billing units
@@ -34,6 +41,13 @@ The app has two deliberately simple flows. One manager maintains reusable famili
 Named user accounts, participant passwords, approval workflows, payment integrations, and exports are intentionally outside the v1.0 MVP.
 
 ## Architecture
+
+Engineering and product handoff documents:
+
+- [`architecture/Group_Expense_Sharing_PRD.md`](architecture/Group_Expense_Sharing_PRD.md) — product requirements baseline
+- [`architecture/System_Engineering_Improvement_Plan_v1.0.md`](architecture/System_Engineering_Improvement_Plan_v1.0.md) — v1.0 stabilization and QA baseline
+- [`architecture/PROJECT_CONTEXT.md`](architecture/PROJECT_CONTEXT.md) — approved decisions, completed work, and current release status
+- [`architecture/CODEX_PROJECT_ONBOARDING.md`](architecture/CODEX_PROJECT_ONBOARDING.md) — recommended learning order and next steps for coding agents
 
 ```text
 src/
@@ -57,11 +71,24 @@ cd group-expense-sharing
 npm ci
 ```
 
+Create a private Supabase project for this deployment, apply every file in `supabase/migrations` in chronological order, and copy `.env.example` to `.env.local` with that project's URL and publishable key. Each deployment is an independent private instance; never point a fork at another operator's Supabase project.
+
 ## Development
 
 ```bash
 npm run dev
 ```
+
+Build and synchronize the local Android edition:
+
+```bash
+npm run android:sync
+cd android
+./gradlew assembleDebug
+```
+
+Private release APKs are signed from ignored material under
+`release-artifacts/signing/`; never commit that directory or an APK.
 
 Run automated checks:
 
@@ -85,11 +112,13 @@ The workflow in `.github/workflows/deploy-pages.yml` tests, lints, builds, and d
 
 The connected Supabase project uses the migrations in `supabase/migrations`. Anonymous sign-ins must be enabled under Authentication settings for passwordless group invitations.
 
+Configure the GitHub repository variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` before deploying. The stable administration entry is `?view=admin`; event reporting links are generated per event. The first administrator code is bootstrapped only by the legacy owner of an existing instance. A new installation must create its initial group through its controlled setup environment before exposing the site publicly.
+
 In the repository settings, select **GitHub Actions** as the GitHub Pages source. The Vite base path is derived automatically from the repository name during the workflow.
 
 ## Data and privacy
 
-Families, members, events, attendance, expenses, reporter identity, calculation snapshots, and receipt associations are stored in Supabase. Compressed receipt images are stored in the private Supabase Storage bucket and loaded with signed URLs. OCR processing itself stays in the participant's browser and only suggests an editable amount. LocalStorage is limited to language, active-manager context, and the last opened participant event; legacy business data is removed after its one-time migration. Participants cannot change families, events, attendance, settlement settings, or existing expenses.
+Families, members, events, attendance, expenses, reporter identity, calculation snapshots, and receipt associations are stored in Supabase. Compressed receipt images are stored in the private Supabase Storage bucket and loaded with signed URLs. OCR processing itself stays in the participant's browser and only suggests an editable amount. LocalStorage is limited to language, active-manager context, and the last opened participant event; legacy business data is removed after its one-time migration. Participants cannot change families, events, attendance, or settlement settings; they may update only expense reports created by their own authenticated anonymous session.
 
 ## Versioning
 

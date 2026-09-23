@@ -50,7 +50,7 @@ export function GroupWorkspace({ units, members, events, language, onLanguageCha
   const submitMember = () => {
     const memberName = memberForm.name.trim();
     if (!memberName || !effectiveUnitId) return;
-    const details = { name: memberName, birthDate: memberForm.birthDate || undefined, manualWeight: memberForm.manualWeight ? Number(memberForm.manualWeight) : undefined, notes: memberForm.notes.trim() || undefined, active: memberForm.active };
+    const details = { name: memberName, birthDate: memberForm.birthDate || undefined, manualWeight: memberForm.manualWeight === "" ? undefined : Number(memberForm.manualWeight), notes: memberForm.notes.trim() || undefined, active: memberForm.active };
     if (editingMemberId) onUpdateMember(editingMemberId, details); else onAddMember(effectiveUnitId, details);
     setMemberForm(initialMemberForm); setEditingMemberId(null);
   };
@@ -92,7 +92,7 @@ export function GroupWorkspace({ units, members, events, language, onLanguageCha
             <label className="check-label"><input type="checkbox" checked={memberForm.active} onChange={(event) => setMemberForm({ ...memberForm, active: event.target.checked })} /> {t("active")}</label>
             <button className="primary-button" onClick={submitMember}><Plus size={19} /> {editingMemberId ? t("saveMember") : t("addMember")}</button>
           </div>
-          <div className="member-list">{unitMembers.length === 0 ? <div className="small-empty">{t("noMembers")}</div> : unitMembers.map((member) => <article className={`member-chip ${!member.active ? "inactive" : ""}`} key={member.id}><div className="avatar"><UserRound size={17} /></div><div><strong>{member.name}</strong><span>{member.birthDate ? `${t("born")} ${member.birthDate}` : member.manualWeight ? `${t("weight")} ${member.manualWeight}` : t("defaultWeight")}</span></div><div className="card-actions"><IconButton label={`${t("rename")} ${member.name}`} onClick={() => editMember(member)}><Pencil size={16} /></IconButton><IconButton label={`${t("delete")} ${member.name}`} onClick={() => onDeleteMember(member.id)}><Trash2 size={16} /></IconButton></div></article>)}</div>
+          <div className="member-list">{unitMembers.length === 0 ? <div className="small-empty">{t("noMembers")}</div> : unitMembers.map((member) => <article className={`member-chip ${!member.active ? "inactive" : ""}`} key={member.id}><div className="avatar"><UserRound size={17} /></div><div><strong>{member.name}</strong><span>{member.manualWeight != null ? `${t("weight")} ${member.manualWeight}` : member.birthDate ? `${t("born")} ${member.birthDate}` : t("defaultWeight")}</span></div><div className="card-actions"><IconButton label={`${t("rename")} ${member.name}`} onClick={() => editMember(member)}><Pencil size={16} /></IconButton><IconButton label={`${t("delete")} ${member.name}`} onClick={() => onDeleteMember(member.id)}><Trash2 size={16} /></IconButton></div></article>)}</div>
         </>}
       </section>}
     </div>

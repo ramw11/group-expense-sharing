@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">מתחלקים</string>
+    <string name="title_activity_main">מתחלקים</string>
+    <string name="package_name">com.ramw11.groupexpenses</string>
+    <string name="custom_url_scheme">com.ramw11.groupexpenses</string>
+</resources>
