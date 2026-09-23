@@ -50,7 +50,7 @@ export function GroupWorkspace({ units, members, events, language, onLanguageCha
   const submitMember = () => {
     const memberName = memberForm.name.trim();
     if (!memberName || !effectiveUnitId) return;
-    const details = { name: memberName, birthDate: memberForm.birthDate || undefined, manualWeight: memberForm.manualWeight ? Number(memberForm.manualWeight) : undefined, notes: memberForm.notes.trim() || undefined, active: memberForm.active };
+    const details = { name: memberName, birthDate: memberForm.birthDate || undefined, manualWeight: memberForm.manualWeight === "" ? undefined : Number(memberForm.manualWeight), notes: memberForm.notes.trim() || undefined, active: memberForm.active };
     if (editingMemberId) onUpdateMember(editingMemberId, details); else onAddMember(effectiveUnitId, details);
     setMemberForm(initialMemberForm); setEditingMemberId(null);
   };
