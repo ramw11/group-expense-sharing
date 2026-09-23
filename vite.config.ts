@@ -7,12 +7,12 @@ const packageVersion = (JSON.parse(readFileSync(new URL("./package.json", import
 
 const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1];
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: process.env.GITHUB_ACTIONS && repositoryName ? `/${repositoryName}/` : "/",
   define: { __APP_VERSION__: JSON.stringify(packageVersion) },
   plugins: [
     react(),
-    VitePWA({
+    ...(mode === "android" ? [] : [VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon-180x180.png"],
       manifest: {
@@ -30,6 +30,6 @@ export default defineConfig({
         ],
       },
       workbox: { globPatterns: ["**/*.{js,css,html,svg,png}"] },
-    }),
+    })]),
   ],
-});
+}));

@@ -28,7 +28,10 @@ npm install
 npm run android:sync
 ```
 
-`android:sync` builds the web application and copies the resulting assets and plugin configuration into the native project.
+`android:sync` builds the Android-specific web bundle and copies the resulting
+assets and plugin configuration into the native project. The Android bundle does
+not register the website PWA service worker; native application updates must load
+the assets packaged in the installed APK rather than a stale WebView cache.
 
 ## Open in Android Studio
 

@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+## 2.0.1 - 2026-09-23
+
 - Fixed Android backup import by opening the native system document picker, including Google Drive and other document providers, for `.gesbackup` files.
+- Prevented Android upgrades from loading stale website PWA assets by packaging a service-worker-free native bundle on an isolated internal origin.
 
 ## 2.0.0 - 2026-09-23
 

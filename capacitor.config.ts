@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: "מתחלקים",
   webDir: "dist",
   server: {
+    hostname: "mitchalkim.local",
     androidScheme: "https",
   },
   plugins: {
