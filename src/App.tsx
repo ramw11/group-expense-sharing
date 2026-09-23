@@ -34,6 +34,8 @@ import { calculationSettingsFrom, defaultSettings, emptyPersistentData } from ".
 import type { BillingUnit, CloudConnection, Event, Expense, Language, Member, PersistentData, Settings } from "./domain/models";
 import { discardLegacyBusinessData, loadDevicePreferences, loadLegacyBusinessData, saveDevicePreferences } from "./storage/localStorage";
 import { createId } from "./utils/id";
+import { createPortableBackup } from "./application/portableBackup";
+import { exportBlob } from "./platforms/exportFile";
 
 type Screen = { name: "participant-home" } | { name: "participant-expense"; eventId: string } | { name: "admin-access"; bootstrap: boolean } | { name: "admin-home" } | { name: "families" } | { name: "event"; eventId: string } | { name: "settings" };
 type CloudStatus = "idle" | "syncing" | "synced" | "error";
@@ -246,12 +248,27 @@ export default function App() {
     setData((current) => ({ ...current, settings }));
     if (connection?.role === "owner") void runCloud(saveCloudSettings(connection.groupId, settings)).catch(() => undefined);
   };
+  const exportAndroidBackup = async () => {
+    const backup = await createPortableBackup(data, async (expense) => {
+      if (!expense.receiptUrl) return undefined;
+      const response = await fetch(expense.receiptUrl);
+      if (!response.ok) return undefined;
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsDataURL(blob);
+      });
+    });
+    await exportBlob(new Blob([JSON.stringify(backup)], { type: "application/json" }), `mitchalkim-web-export-${new Date().toISOString().slice(0, 10)}.gesbackup`, language === "he" ? "ייצוא לאפליקציה" : "Export to app");
+  };
 
   const participantHome = <ParticipantHome events={participantEvents} families={repositoryFamilies} joined={participantEvents.length > 0} canManage language={language} statusMessage={cloudMessage} onLanguageChange={setLanguage} onChooseEvent={(eventId) => setScreen({ name: "participant-expense", eventId })} onManage={() => { void openAdminAccess(); }} />;
 
   if (inviteStatus !== "none") return <ParticipantJoinState language={language} status={inviteStatus} onLanguageChange={setLanguage} />;
   if (screen.name === "admin-access") return <AdminAccessScreen language={language} bootstrap={screen.bootstrap} onLanguageChange={setLanguage} onBack={() => setScreen(connection?.role === "participant" && connection.eventId ? { name: "participant-expense", eventId: connection.eventId } : { name: "participant-home" })} onSubmit={(code) => authenticateAdmin(code, screen.bootstrap)} />;
-  if (screen.name === "settings" && connection?.role === "owner") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onChangeAdminCode={changeAdminCode} onBack={() => setScreen({ name: "admin-home" })} />;
+  if (screen.name === "settings" && connection?.role === "owner") return <SettingsScreen settings={data.settings} language={language} onLanguageChange={setLanguage} onChange={saveSettings} onChangeAdminCode={changeAdminCode} onExportBackup={exportAndroidBackup} onBack={() => setScreen({ name: "admin-home" })} />;
   if (screen.name === "families" && primaryGroup && connection?.role === "owner") return <GroupWorkspace group={primaryGroup} units={repositoryFamilies} members={data.members} events={data.events} language={language} onLanguageChange={setLanguage} onBack={() => setScreen({ name: "admin-home" })} onAddUnit={(name) => { const family = { id: createId(), groupId: primaryGroup.id, name, order: repositoryFamilies.length }; setData((current) => ({ ...current, billingUnits: [...current.billingUnits, family] })); void runCloud(saveCloudUnit(family)).catch(() => undefined); }} onRenameUnit={(id, name) => { const family = data.billingUnits.find((item) => item.id === id); if (!family) return; const updated = { ...family, name }; setData((current) => ({ ...current, billingUnits: current.billingUnits.map((item) => item.id === id ? updated : item) })); void runCloud(saveCloudUnit(updated)).catch(() => undefined); }} onDeleteUnit={(id) => { if (data.events.some((event) => event.familyIds.includes(id))) return; setData((current) => ({ ...current, billingUnits: current.billingUnits.filter((unit) => unit.id !== id), members: current.members.filter((member) => member.billingUnitId !== id) })); void runCloud(deleteCloudUnit(id)).catch(() => undefined); }} onAddMember={(familyId, details) => { const member = { ...details, id: createId(), billingUnitId: familyId, order: data.members.filter((item) => item.billingUnitId === familyId).length }; setData((current) => ({ ...current, members: [...current.members, member] })); void runCloud(saveCloudMember(primaryGroup.id, member)).catch(() => undefined); }} onUpdateMember={(id, details) => { const member = data.members.find((item) => item.id === id); if (!member) return; const updated = { ...member, ...details }; setData((current) => ({ ...current, members: current.members.map((item) => item.id === id ? updated : item) })); void runCloud(saveCloudMember(primaryGroup.id, updated)).catch(() => undefined); }} onDeleteMember={(id) => { setData((current) => ({ ...current, members: current.members.filter((member) => member.id !== id) })); void runCloud(deleteCloudMember(id)).catch(() => undefined); }} onAssignFamily={assignFamily} onCreateEventWithFamily={(familyId, name) => createEvent(name, familyId)} />;
   if (screen.name === "event" && primaryGroup && connection?.role === "owner") {
     const event = data.events.find((item) => item.id === screen.eventId);
