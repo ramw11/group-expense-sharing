@@ -20,6 +20,8 @@
 # misc
 .DS_Store
 *.pem
+*.jks
+*.keystore
 
 # debug
 npm-debug.log*
@@ -41,3 +43,6 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
+
+# local Android release artifacts and signing material
+/release-artifacts/
