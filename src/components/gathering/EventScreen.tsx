@@ -23,7 +23,7 @@ interface EventScreenProps {
   cloudMessage: string;
   onLanguageChange(language: Language): void;
   onSave(draft: Event): void;
-  onShare(draft: Event): Promise<string>;
+  onShare?(draft: Event): Promise<string>;
   onCreateFamily(family: BillingUnit, members: Member[]): void;
   onBack(): void;
   onEditGroup(): void;
@@ -152,6 +152,7 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
   ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(report); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   const createEventLink = async () => {
+    if (!onShare) return;
     setEventShareLoading(true);
     setEventShareFailed(false);
     try { setEventShareUrl(await onShare(currentDraft())); }
@@ -177,7 +178,7 @@ export function EventScreen({ group, repositoryFamilies, repositoryMembers, sett
 
       <main className="gathering-main">
         <section className="gathering-intro">
-          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label><button className="event-inline-share" disabled={eventShareLoading || cloudStatus === "syncing"} onClick={() => { void createEventLink(); }}>{eventShareLoading ? <LoaderCircle className="spin" size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button>{eventShareFailed && <p className="share-link-error">{t("linkCreationFailed")}</p>}{eventShareUrl && <ShareLinkPanel url={eventShareUrl} title={eventName.trim() || t("unnamedEvent")} language={language} onClose={() => setEventShareUrl("")} />}</div>
+          <div><p className="eyebrow">{t("eventDetails")}</p><h1>{t("whoIsHere")}</h1><label className="event-name-field"><span>{t("eventName")}</span><input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={t("eventNamePlaceholder")} /></label>{onShare && <><button className="event-inline-share" disabled={eventShareLoading || cloudStatus === "syncing"} onClick={() => { void createEventLink(); }}>{eventShareLoading ? <LoaderCircle className="spin" size={20} /> : <Link2 size={20} />}<span><strong>{t("shareThisEvent")}</strong><small>{t("shareThisEventCopy")}</small></span></button>{eventShareFailed && <p className="share-link-error">{t("linkCreationFailed")}</p>}{eventShareUrl && <ShareLinkPanel url={eventShareUrl} title={eventName.trim() || t("unnamedEvent")} language={language} onClose={() => setEventShareUrl("")} />}</>}</div>
           <div className="attendance-score"><strong>{presentCount}</strong><span>{t("of")} {activeMembers.length}<br />{t("attending")}</span></div>
         </section>
 

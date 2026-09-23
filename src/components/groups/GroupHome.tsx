@@ -18,7 +18,7 @@ interface GroupHomeProps {
   onStart(id: string): void;
   onFamilies(): void;
   onSettings(): void;
-  onParticipantHome(): void;
+  onParticipantHome?(): void;
 }
 
 export function GroupHome({ events, families, cloudStatus, cloudMessage, language, onLanguageChange, onCreate, onUpdate, onDelete, onStart, onFamilies, onSettings, onParticipantHome }: GroupHomeProps) {
@@ -32,7 +32,7 @@ export function GroupHome({ events, families, cloudStatus, cloudMessage, languag
     setName(""); setEditingId(null);
   };
   return <div className="page-shell">
-    <div className="home-tools"><LanguageToggle language={language} onChange={onLanguageChange} /><button className="participant-trigger" onClick={onParticipantHome}><ReceiptText size={18} /> {t("reportExpense")}</button><button className="family-trigger" onClick={onFamilies}><FolderHeart size={18} /> {t("familyRepository")} <b>{families.length}</b></button><button className="settings-trigger" onClick={onSettings}><Settings size={18} /> {t("settings")}</button></div>
+    <div className="home-tools"><LanguageToggle language={language} onChange={onLanguageChange} />{onParticipantHome && <button className="participant-trigger" onClick={onParticipantHome}><ReceiptText size={18} /> {t("reportExpense")}</button>}<button className="family-trigger" onClick={onFamilies}><FolderHeart size={18} /> {t("familyRepository")} <b>{families.length}</b></button><button className="settings-trigger" onClick={onSettings}><Settings size={18} /> {t("settings")}</button></div>
     <header className="hero-grid"><div><p className="eyebrow">{t("managerHome")}</p><h1>{t("homeTitleA")}<br /><span>{t("homeTitleB")}</span></h1><p className="hero-copy">{t("homeCopyIndependent")}</p></div><div className="hero-orbit" aria-hidden="true"><div className="orbit-card orbit-one">₪</div><div className="orbit-card orbit-two"><CalendarDays size={31} /></div><div className="orbit-dot" /></div></header>
     {(cloudStatus !== "idle" || cloudMessage) && <div className={`cloud-banner ${cloudStatus}`}>{cloudStatus === "syncing" ? <LoaderCircle className="spin" size={18} /> : cloudStatus === "error" ? <CloudAlert size={18} /> : <Cloud size={18} />}<strong>{cloudStatus === "syncing" ? t("syncing") : cloudStatus === "error" ? t("syncError") : t("synced")}</strong>{cloudMessage && <span>{cloudMessage}</span>}</div>}
 
