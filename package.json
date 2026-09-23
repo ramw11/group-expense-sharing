@@ -1,15 +1,16 @@
 {
   "name": "group-expense-sharing",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:android": "tsc -b && vite build --mode android",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
-    "android:sync": "npm run build && cap sync android",
+    "android:sync": "npm run build:android && cap sync android",
     "android:open": "cap open android",
     "android:run": "npm run android:sync && cap run android"
   },
@@ -20,6 +21,7 @@
     "@capacitor/core": "8.5.2",
     "@capacitor/filesystem": "8.1.3",
     "@capacitor/share": "8.0.2",
+    "@capawesome/capacitor-file-picker": "8.1.0",
     "@supabase/supabase-js": "2.112.2",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
