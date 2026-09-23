@@ -10,6 +10,7 @@ import { AndroidReceiptStore } from "../../infrastructure/local/androidReceiptSt
 import { AndroidDataManagement } from "./AndroidDataManagement";
 import { createId } from "../../utils/id";
 import { dataWithEmbeddedReceipts, parsePortableBackup } from "../../application/portableBackup";
+import { isFilePickerCancellation, pickBackupText } from "./backupFilePicker";
 
 type Screen = { name: "home" } | { name: "families" } | { name: "settings" } | { name: "data" } | { name: "event"; eventId: string };
 const receiptStore = new AndroidReceiptStore();
@@ -67,9 +68,20 @@ export function AndroidApp() {
     saveEvent({ ...event, familyIds: [...event.familyIds, familyId], attendance: [...event.attendance, ...members.map((member) => ({ memberId: member.id, present: true }))], updatedAt: new Date().toISOString() });
   };
   const createFamily = (family: BillingUnit, members: Member[]) => commit((current) => ({ ...current, billingUnits: [...current.billingUnits, family], members: [...current.members, ...members] }));
+  const importFirstBackup = async () => {
+    setImporting(true); setError("");
+    try {
+      const raw = await pickBackupText();
+      if (!raw) return;
+      const backup = await parsePortableBackup(raw);
+      setData(await repository.replace(dataWithEmbeddedReceipts(backup)));
+    } catch (reason) {
+      if (!isFilePickerCancellation(reason)) setError(reason instanceof Error ? reason.message : "הייבוא נכשל");
+    } finally { setImporting(false); }
+  };
 
   if (loading) return <main className="android-state"><img src="/favicon.svg" alt="" /><h1>מתחלקים</h1><p>פותח את הנתונים המקומיים…</p></main>;
-  if (!primaryGroup) return <main className="android-onboarding" dir="rtl"><img src="/favicon.svg" alt="לוגו מתחלקים" /><p>האפליקציה הפרטית שלך</p><h1>מתחילים מקבוצה אחת מסודרת.</h1><label><span>שם הקבוצה</span><input autoFocus value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="לדוגמה: המשפחה שלנו" /></label><button disabled={!groupName.trim() || importing} onClick={() => { const group = { id: createId(), name: groupName.trim() }; commit((current) => ({ ...current, groups: [group], settings: { ...defaultSettings, language: "he" } })); }}>יצירת קבוצה מקומית</button><div className="onboarding-divider"><span>או</span></div><input hidden id="onboarding-backup" type="file" accept=".gesbackup,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; setImporting(true); void file.text().then(parsePortableBackup).then((backup) => repository.replace(dataWithEmbeddedReceipts(backup))).then(setData).catch((reason) => setError(reason instanceof Error ? reason.message : "הייבוא נכשל")).finally(() => setImporting(false)); }} /><label className="onboarding-import" htmlFor="onboarding-backup">{importing ? "מייבא את הנתונים…" : "ייבוא גיבוי מהאתר או מהאפליקציה"}</label>{error && <p className="submit-error">{error}</p>}</main>;
+  if (!primaryGroup) return <main className="android-onboarding" dir="rtl"><img src="/favicon.svg" alt="לוגו מתחלקים" /><p>האפליקציה הפרטית שלך</p><h1>מתחילים מקבוצה אחת מסודרת.</h1><label><span>שם הקבוצה</span><input autoFocus value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="לדוגמה: המשפחה שלנו" /></label><button disabled={!groupName.trim() || importing} onClick={() => { const group = { id: createId(), name: groupName.trim() }; commit((current) => ({ ...current, groups: [group], settings: { ...defaultSettings, language: "he" } })); }}>יצירת קבוצה מקומית</button><div className="onboarding-divider"><span>או</span></div><button className="onboarding-import" disabled={importing} onClick={() => void importFirstBackup()}>{importing ? "מייבא את הנתונים…" : "ייבוא גיבוי מ‑Drive או מהמכשיר"}</button>{error && <p className="submit-error">{error}</p>}</main>;
 
   const status = error ? "error" as const : "idle" as const;
   if (screen.name === "data") return <AndroidDataManagement data={data} repository={repository} receipts={receiptStore} onBack={() => setScreen({ name: "settings" })} onRestored={(restored) => { setData(restored); setScreen({ name: "home" }); }} />;
