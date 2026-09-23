@@ -2,6 +2,7 @@ import { Check, Copy, Download, FileImage, FileType2, LoaderCircle, X } from "lu
 import { useRef, useState } from "react";
 import type { EventCalculation, Settlement } from "../../business/calculations";
 import type { BillingUnit, CalculationSettings, Expense, Language, Member } from "../../domain/models";
+import { exportBlob, exportDataUrl } from "../../platforms/exportFile";
 
 interface CalculationAuditReportProps {
   eventName: string;
@@ -60,10 +61,7 @@ export function CalculationAuditReport({ eventName, eventDate, units, members, e
     `${l.checks}: ${checks.map((item) => `${item.label}=${item.ok ? l.statusOk : l.statusError}`).join("; ")}`,
   ].join("\n");
   const copyReport = async () => { await navigator.clipboard.writeText(reportText); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
-  const downloadReport = () => {
-    const url = URL.createObjectURL(new Blob([reportText], { type: "text/plain;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${eventName || "calculation"}-audit.txt`; anchor.click(); URL.revokeObjectURL(url);
-  };
+  const downloadReport = () => exportBlob(new Blob([reportText], { type: "text/plain;charset=utf-8" }), `${eventName || "calculation"}-audit.txt`, l.title);
   const safeFileName = (eventName || "calculation").replace(/[\\/:*?"<>|]/g, "-");
   const captureReport = async () => {
     if (!reportRef.current) throw new Error("Report is not available");
@@ -80,10 +78,7 @@ export function CalculationAuditReport({ eventName, eventDate, units, members, e
     setExporting("image");
     try {
       const canvas = await captureReport();
-      const anchor = document.createElement("a");
-      anchor.download = `${safeFileName}-audit.png`;
-      anchor.href = canvas.toDataURL("image/png");
-      anchor.click();
+      await exportDataUrl(canvas.toDataURL("image/png"), `${safeFileName}-audit.png`, l.title);
     } finally { setExporting(undefined); }
   };
   const exportPdf = async () => {
@@ -104,12 +99,12 @@ export function CalculationAuditReport({ eventName, eventDate, units, members, e
         pdf.addImage(image, "JPEG", margin, margin - offset, imageWidth, imageHeight, undefined, "FAST");
         offset += pageHeight - margin * 2;
       }
-      pdf.save(`${safeFileName}-audit.pdf`);
+      await exportBlob(pdf.output("blob"), `${safeFileName}-audit.pdf`, l.title);
     } finally { setExporting(undefined); }
   };
 
   return <section className="audit-report" aria-label={l.title} ref={reportRef}>
-    <header><div><p>{eventDate}</p><h3>{l.title}</h3><span>{l.subtitle}</span></div><div data-export-hide><button onClick={() => { void copyReport(); }}><Copy size={17} /> {copied ? l.copied : l.copy}</button><button onClick={downloadReport}><Download size={17} /> {l.download}</button><button disabled={Boolean(exporting)} onClick={() => { void exportImage(); }}>{exporting === "image" ? <LoaderCircle className="spin" size={17} /> : <FileImage size={17} />} {language === "he" ? "תמונה" : "Image"}</button><button disabled={Boolean(exporting)} onClick={() => { void exportPdf(); }}>{exporting === "pdf" ? <LoaderCircle className="spin" size={17} /> : <FileType2 size={17} />} PDF</button><button aria-label={l.close} onClick={onClose}><X size={18} /></button></div></header>
+    <header><div><p>{eventDate}</p><h3>{l.title}</h3><span>{l.subtitle}</span></div><div data-export-hide><button onClick={() => { void copyReport(); }}><Copy size={17} /> {copied ? l.copied : l.copy}</button><button onClick={() => { void downloadReport(); }}><Download size={17} /> {l.download}</button><button disabled={Boolean(exporting)} onClick={() => { void exportImage(); }}>{exporting === "image" ? <LoaderCircle className="spin" size={17} /> : <FileImage size={17} />} {language === "he" ? "תמונה" : "Image"}</button><button disabled={Boolean(exporting)} onClick={() => { void exportPdf(); }}>{exporting === "pdf" ? <LoaderCircle className="spin" size={17} /> : <FileType2 size={17} />} PDF</button><button aria-label={l.close} onClick={onClose}><X size={18} /></button></div></header>
     <div className="audit-checks"><strong>{l.checks}</strong>{checks.map((item) => <span className={item.ok ? "ok" : "error"} key={item.label}><Check size={15} /> {item.label}: {item.ok ? l.statusOk : l.statusError}</span>)}</div>
     <div className="audit-rules"><div><span>{l.settings}</span><strong>{language === "he" ? "משקל אישי ← גיל ← ברירת מחדל 1" : "Member weight → age → default 1"}</strong></div><div><span>{l.childRule}</span><strong>{settings.childAgeThreshold}</strong></div><div><span>{l.childWeight}</span><strong>{number(settings.childWeight)}</strong></div><div><span>{l.rounding}</span><strong>{roundingLabel}</strong></div></div>
     <div className="audit-formula"><span>{l.formula}</span><strong>{money(calculation.totalPaid)} ÷ {number(calculation.totalWeight)} = {money(calculation.costPerWeight)}</strong><p>{l.formulaCopy}</p></div>

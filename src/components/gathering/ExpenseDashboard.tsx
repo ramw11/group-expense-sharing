@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, CircleDollarSign, FileDown, LoaderCircle, 
 import { useRef, useState } from "react";
 import type { EventCalculation, Settlement } from "../../business/calculations";
 import type { BillingUnit, Expense, Language, Member } from "../../domain/models";
+import { exportBlob } from "../../platforms/exportFile";
 
 interface ExpenseDashboardProps {
   units: BillingUnit[];
@@ -69,7 +70,8 @@ export function ExpenseDashboard({ units, members, expenses, calculation, curren
         const imageHeight = canvas.height * scale;
         pdf.addImage(canvas.toDataURL("image/jpeg", .94), "JPEG", (pageWidth - imageWidth) / 2, margin, imageWidth, imageHeight, undefined, "FAST");
       });
-      pdf.save(`${(eventName || "dashboard").replace(/[\\/:*?"<>|]/g, "-")}-dashboard.pdf`);
+      const fileName = `${(eventName || "dashboard").replace(/[\\/:*?"<>|]/g, "-")}-dashboard.pdf`;
+      await exportBlob(pdf.output("blob"), fileName, he ? "שיתוף דוח Dashboard" : "Share dashboard report");
     } finally { exportRoot?.remove(); setExporting(false); }
   };
 
