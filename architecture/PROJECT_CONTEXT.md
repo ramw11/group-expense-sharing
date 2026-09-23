@@ -2,9 +2,26 @@
 
 **Project:** Group Expense Sharing  
 **Repository:** `ramw11/group-expense-sharing`  
-**Current application version:** `2.0.0`
+**Current application version:** `2.0.0` (`2.0.1` Android import fix prepared)
 **Last updated:** 2026-09-23
 **Status:** Android Solo Admin Phase A implemented; private signed release prepared
+
+### Android backup import maintenance
+
+The first Android maintenance release replaces WebView file inputs in both the
+first-run migration and Settings restore flows with Android's native system
+document picker. The picker accepts both `application/json` and
+`application/octet-stream`, because `.gesbackup` files and third-party document
+providers such as Google Drive may report either type. Selected content is read
+through the plugin-provided WebView path instead of loading Base64 data eagerly.
+
+Verification completed on the Android 14 emulator: the native DocumentsUI picker
+opened, exposed Google Drive, selected the real web export
+`mitchalkim-web-export-2026-09-23.gesbackup`, and restored its five families and
+the `נופש בעין יעקב` event. Vitest passed 32 tests across eight files, ESLint
+passed, the production Vite build passed, Capacitor synced five native plugins,
+and the Android debug unit test and APK build passed. A signed release build and
+upgrade verification are required before publishing `2.0.1`.
 
 ## 1. Purpose of this document
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed Android backup import by opening the native system document picker, including Google Drive and other document providers, for `.gesbackup` files.
+
 ## 2.0.0 - 2026-09-23
 
 - Added a complete single-administrator Android edition that runs locally in Capacitor without loading the Supabase application.
